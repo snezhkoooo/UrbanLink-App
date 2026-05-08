@@ -1,0 +1,91 @@
+@model IEnumerable<Message>
+@{
+    ViewData["Title"] = "Manage chat";
+
+    string Initials(string? full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "U";
+        var parts = full.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Substring(0, 1).ToUpper();
+        return (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpper();
+    }
+    string AvatarVariant(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        var classes = new[] { "", "ul-avatar-violet", "ul-avatar-mint", "ul-avatar-sunset" };
+        return classes[Math.Abs(key.GetHashCode()) % classes.Length];
+    }
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Dashboard
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Control room · Chat</div>
+        <h2>Manage chat</h2>
+    </div>
+    <span class="ul-pill ul-pill-cyan">@Model.Count() messages</span>
+</div>
+
+@if (Model.Any())
+{
+    <div class="ul-stagger">
+    @foreach (var m in Model)
+    {
+        var u    = m.User;
+        var name = u?.FullName ?? u?.Email ?? "Unknown";
+        var variant = AvatarVariant(m.UserId);
+        <div class="ul-message" style="display:flex; align-items:flex-start; gap:0;">
+            <div style="flex:1;">
+                <div class="ul-message-head">
+                    <div class="ul-avatar @variant" style="width:32px; height:32px; font-size:0.75rem; overflow:hidden; padding:0;">
+                        @if (u != null && !string.IsNullOrEmpty(u.ProfilePicture))
+                        {
+                            <img src="@u.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>
+                        }
+                        else { @Initials(name) }
+                    </div>
+                    <div>
+                        <a class="ul-message-author" asp-action="UserDetails" asp-route-id="@m.UserId" style="text-decoration:none;">@name</a>
+                        @if (u != null && u.Age >= 18)
+                        {
+                            <span class="ul-age-tag">· @u.Age</span>
+                        }
+                        @if (u != null && u.IsVerified)
+                        {
+                            <span class="ul-badge ul-badge-verified" title="Verified">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                            </span>
+                        }
+                        <div class="ul-message-time" style="margin-left:0;">
+                            @m.CreatedOn.ToString("MMM d · HH:mm")
+                            @if (m.EventId != null && m.Event != null)
+                            {
+                                <span style="color:var(--accent-mint)"> · @m.Event.Title</span>
+                            }
+                            else
+                            {
+                                <span style="color:var(--text-lo)"> · community chat</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="ul-message-body" style="margin-top: 0.4rem;">@m.Content</div>
+            </div>
+            <form method="post" asp-action="DeleteMessage" asp-route-id="@m.Id" style="margin:0; flex-shrink:0;" data-confirm-msg="Delete this message?">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="ul-row-action ul-row-action-delete" style="margin-top:0.25rem;" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </button>
+            </form>
+        </div>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty ul-enter"><div class="ul-empty-icon">💬</div><p>No messages yet.</p></div>
+}

@@ -1,0 +1,38 @@
+@page
+@model ExternalLoginModel
+@{
+    ViewData["Title"] = "Almost there";
+}
+
+<div class="ul-auth-wrap">
+    <div class="ul-auth-card ul-enter">
+        <div class="ul-section-sub">/ Almost there</div>
+        <h2 style="margin-top: 0.4rem;">Finish signing up</h2>
+        <p style="margin-top: 0.4rem; margin-bottom: 1.5rem; color: var(--text-mid);">
+            You're signing in with <strong>@Model.ProviderDisplayName</strong>. Just a couple of details and you're in.
+        </p>
+
+        <form method="post" asp-page-handler="Confirmation" asp-route-returnUrl="@Model.ReturnUrl">
+            <div asp-validation-summary="ModelOnly" class="ul-auth-error"></div>
+
+            <div class="ul-form-row">
+                <label asp-for="Input.FullName">Full name</label>
+                <input asp-for="Input.FullName" class="ul-input" />
+                <span asp-validation-for="Input.FullName" class="ul-field-error"></span>
+            </div>
+            <div class="ul-form-row">
+                <label asp-for="Input.Email">Email</label>
+                <input asp-for="Input.Email" class="ul-input" readonly />
+            </div>
+            <div class="ul-form-row">
+                <label asp-for="Input.Age">Age</label>
+                <input asp-for="Input.Age" type="number" min="18" max="99" class="ul-input" />
+                <span asp-validation-for="Input.Age" class="ul-field-error"></span>
+            </div>
+
+            <button type="submit" class="ul-btn ul-btn-success" style="width:100%; justify-content:center; margin-top: 1.25rem;">
+                Create account
+            </button>
+        </form>
+    </div>
+</div>

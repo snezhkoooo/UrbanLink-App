@@ -1,0 +1,55 @@
+@* _Avatar.cshtml
+   Parameters (via ViewData):
+     ulAvatarUser   - ApplicationUser object (required)
+     ulAvatarSize   - px integer, default 40
+     ulAvatarLink   - bool, default false (wraps in <a> to Profile/View)
+*@
+@{
+    var u    = ViewData["ulAvatarUser"] as UrbanLinkStarter.Models.ApplicationUser;
+    var size = ViewData["ulAvatarSize"] is int s ? s : 40;
+    var link = ViewData["ulAvatarLink"] is bool l ? l : false;
+
+    if (u == null) { return; }
+
+    var name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "U") : u.FullName;
+    var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    var initials = parts.Length == 1
+        ? parts[0].Substring(0, 1).ToUpper()
+        : (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpper();
+
+    var classes = new[] { "", "ul-avatar-violet", "ul-avatar-mint", "ul-avatar-sunset" };
+    var variantClass = string.IsNullOrEmpty(u.ProfilePicture)
+        ? classes[Math.Abs(u.Id.GetHashCode()) % classes.Length]
+        : "";
+
+    var style = $"width:{size}px;height:{size}px;font-size:{(int)(size*0.38)}px;overflow:hidden;padding:0;";
+    var tag   = link ? "a" : "div";
+    var href  = link ? $"/Profile/View/{u.Id}" : null;
+}
+
+@if (link)
+{
+    <a class="ul-avatar @variantClass" href="/Profile/View/@u.Id" style="@style text-decoration:none;">
+        @if (!string.IsNullOrEmpty(u.ProfilePicture))
+        {
+            <img src="@u.ProfilePicture" alt="@name" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+        }
+        else
+        {
+            @initials
+        }
+    </a>
+}
+else
+{
+    <div class="ul-avatar @variantClass" style="@style">
+        @if (!string.IsNullOrEmpty(u.ProfilePicture))
+        {
+            <img src="@u.ProfilePicture" alt="@name" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+        }
+        else
+        {
+            @initials
+        }
+    </div>
+}

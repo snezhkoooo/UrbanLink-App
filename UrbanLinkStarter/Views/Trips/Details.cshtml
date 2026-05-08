@@ -1,0 +1,301 @@
+@model Trip
+@{
+    ViewData["Title"] = Model.Title;
+    var alreadyReserved = (bool)(ViewBag.AlreadyReserved ?? false);
+    var seatsLeft = (int)(ViewBag.SeatsLeft ?? 0);
+    var isDriver  = (bool)(ViewBag.IsDriver ?? false);
+    var isAuthed  = User.Identity?.IsAuthenticated ?? false;
+    var currentUserId = (string?)(ViewBag.CurrentUserId);
+
+    string Initials(string? n){ if(string.IsNullOrWhiteSpace(n))return "U"; var p=n.Trim().Split(' ',StringSplitOptions.RemoveEmptyEntries); return p.Length==1?p[0][0].ToString().ToUpper():(p[0][0].ToString()+p[^1][0].ToString()).ToUpper(); }
+    string AV(string? k){ if(string.IsNullOrWhiteSpace(k))return ""; var c=new[]{"","ul-avatar-violet","ul-avatar-mint","ul-avatar-sunset"}; return c[Math.Abs(k.GetHashCode())%c.Length]; }
+}
+
+<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;" class="ul-enter">
+    <a class="ul-trip-card-link" asp-action="Index" style="display:inline-flex;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        Find a Trip
+    </a>
+    @if (isDriver && !Model.IsCompleted)
+    {
+        <form method="post" asp-controller="Ratings" asp-action="MarkDone" asp-route-tripId="@Model.Id" style="margin:0;" data-confirm-msg="Mark this trip as completed? Passengers will be asked to rate you.">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color:var(--accent-mint);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                Mark as done
+            </button>
+        </form>
+    }
+    @if (Model.IsCompleted)
+    {
+        <span class="ul-pill ul-pill-mint">✓ Completed</span>
+    }
+    @if (isDriver)
+    {
+        <a class="ul-btn ul-btn-secondary ul-btn-sm" asp-action="Edit" asp-route-id="@Model.Id">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+        </a>
+        <form method="post" asp-action="Delete" asp-route-id="@Model.Id" style="margin:0;" data-confirm-msg="Delete this trip? All reservations will be removed.">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color:var(--accent-magenta);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                Delete
+            </button>
+        </form>
+    }
+</div>
+
+@if (TempData["Success"] != null) {
+    <div class="ul-card ul-enter" style="border-color:rgba(78,224,176,0.4);background:rgba(78,224,176,0.05);margin-bottom:1rem;"><p style="margin:0;color:var(--accent-mint);">@TempData["Success"]</p></div>
+}
+@if (TempData["Error"] != null) {
+    <div class="ul-auth-error ul-enter" style="margin-bottom:1rem;">@TempData["Error"]</div>
+}
+
+<section class="ul-detail-hero ul-enter">
+    <div class="ul-section-sub">/ Trip details</div>
+    <h1 style="margin-top:0.4rem;margin-bottom:1.25rem;">@Model.Title</h1>
+    <div class="ul-route" style="max-width:640px;">
+        <div class="ul-route-stop"><div class="ul-route-stop-label">From</div><div class="ul-route-stop-name">@Model.FromLocation</div></div>
+        <div class="ul-route-line"></div>
+        <div class="ul-route-stop" style="text-align:right;"><div class="ul-route-stop-label">To</div><div class="ul-route-stop-name">@Model.ToLocation</div></div>
+    </div>
+    <div class="ul-detail-grid ul-stagger">
+        <div class="ul-detail-fact"><div class="ul-detail-fact-label">Date</div><div class="ul-detail-fact-value">@Model.TravelDate.ToString("MMM d")</div></div>
+        <div class="ul-detail-fact"><div class="ul-detail-fact-label">Departure</div><div class="ul-detail-fact-value">@Model.TravelDate.ToString("HH:mm")</div></div>
+        <div class="ul-detail-fact"><div class="ul-detail-fact-label">Seats left</div><div class="ul-detail-fact-value">@seatsLeft / @Model.AvailableSeats</div></div>
+        <div class="ul-detail-fact"><div class="ul-detail-fact-label">Per seat</div><div class="ul-detail-fact-value">@Model.Price.ToString("0.##") BGN</div></div>
+    </div>
+</section>
+
+@if (Model.Driver != null) {
+    <div class="ul-section-head"><div><div class="ul-section-sub">/ Your driver</div><h2>Who's driving</h2></div></div>
+    <div class="ul-card ul-enter" style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+        <a class="ul-avatar @AV(Model.Driver.Id)" asp-controller="Profile" asp-action="View" asp-route-id="@Model.Driver.Id" style="width:72px;height:72px;font-size:1.4rem;overflow:hidden;padding:0;text-decoration:none;">
+            @if(!string.IsNullOrEmpty(Model.Driver.ProfilePicture)){ <img src="@Model.Driver.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(Model.Driver.FullName) }
+        </a>
+        <div style="flex:1;min-width:200px;">
+            <a asp-controller="Profile" asp-action="View" asp-route-id="@Model.Driver.Id" style="text-decoration:none;">
+                @await Html.PartialAsync("_UserName", Model.Driver, new ViewDataDictionary(ViewData){["ulShowAge"]=true,["ulIsAdmin"]=false})
+            </a>
+            <div style="margin-top:0.5rem;color:var(--text-mid);font-size:0.95rem;">
+                <strong style="color:var(--text-hi);">@Model.CarBrand @Model.CarModel</strong> · @Model.CarYear
+                <span style="color:var(--text-lo);"> · @Model.FuelType · @Model.FuelConsumption.ToString("0.#") L/100km</span>
+            </div>
+            @if(Model.DistanceKm.HasValue){ <div style="margin-top:0.4rem;font-family:var(--font-mono);font-size:0.82rem;color:var(--accent-cyan);">≈ @Model.DistanceKm.Value.ToString("0") km</div> }
+        </div>
+    </div>
+}
+
+@* ---- Passengers (driver view) ---- *@
+@if (isDriver && Model.Reservations.Any()) {
+    <div class="ul-section-head" style="margin-top:2rem;"><div><div class="ul-section-sub">/ Booked seats</div><h2>Passengers</h2></div></div>
+    <div style="background:rgba(0,0,0,0.2);border-radius:14px;border:1px solid var(--border);overflow:hidden;">
+    @foreach (var r in Model.Reservations) {
+        var u = r.User; var name = u?.FullName ?? u?.Email ?? "Unknown";
+        string pay(PaymentMethod m)=> m switch { PaymentMethod.Cash=>"💵 Cash", PaymentMethod.Revolut=>"📱 Revolut", PaymentMethod.BankTransfer=>"🏦 Bank", _=>m.ToString() };
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
+            <div class="ul-avatar @AV(r.UserId)" style="width:34px;height:34px;font-size:0.78rem;overflow:hidden;padding:0;flex-shrink:0;">
+                @if(u!=null&&!string.IsNullOrEmpty(u.ProfilePicture)){ <img src="@u.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(name) }
+            </div>
+            <a asp-controller="Profile" asp-action="View" asp-route-id="@r.UserId" style="flex:1;text-decoration:none;font-weight:600;color:var(--text-hi);">@name</a>
+            <span class="ul-pill ul-pill-cyan" style="font-size:0.78rem;">@r.SeatsCount seat@(r.SeatsCount>1?"s":"")</span>
+            <span class="ul-pill" style="font-size:0.78rem;background:rgba(78,224,176,0.1);color:var(--accent-mint);border:1px solid rgba(78,224,176,0.25);">@pay(r.PaymentMethod)</span>
+            <form method="post" asp-controller="Trips" asp-action="RemovePassenger" asp-route-reservationId="@r.Id" style="margin:0;" data-confirm-msg="Remove @name from this trip?">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="ul-row-action ul-row-action-delete" title="Remove passenger">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                </button>
+            </form>
+        </div>
+    }
+    </div>
+}
+
+@* ---- Reservation card ---- *@
+@if (!isDriver) {
+    <div class="ul-section-head" style="margin-top:2rem;"><div><div class="ul-section-sub">/ Book your seat</div><h2>Reserve</h2></div></div>
+    @if (alreadyReserved) {
+        var myRes = Model.Reservations.FirstOrDefault(r => r.UserId == currentUserId);
+        <div class="ul-reserve-card ul-enter" style="text-align:center;">
+            <div style="margin:0 auto 0.75rem;width:48px;height:48px;border-radius:50%;background:var(--grad-mint);display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--bg-deep)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <h3 style="margin:0 0 0.4rem;">You've got a seat!</h3>
+            <p style="color:var(--text-mid);margin:0 0 1rem;">Your booking is confirmed.</p>
+            <div style="display:flex;gap:0.5rem;justify-content:center;">
+                <a class="ul-btn ul-btn-secondary ul-btn-sm" asp-controller="Reservations" asp-action="Index">My reservations</a>
+                @if (myRes != null) {
+                    <form method="post" asp-controller="Reservations" asp-action="Cancel" asp-route-id="@myRes.Id" asp-route-returnTo="trip" style="margin:0;" data-confirm-msg="Cancel your reservation on this trip?">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color:var(--accent-magenta);">Cancel reservation</button>
+                    </form>
+                }
+            </div>
+        </div>
+    } else if (seatsLeft <= 0) {
+        <div class="ul-empty"><div class="ul-empty-icon">🚫</div><p>This trip is fully booked.</p></div>
+    } else if (!isAuthed) {
+        <div class="ul-card ul-enter" style="text-align:center;padding:1.5rem;">
+            <p style="margin:0 0 0.75rem;color:var(--text-mid);">Sign in to reserve a seat.</p>
+            <a class="ul-btn ul-btn-primary" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Details","Trips",new{id=Model.Id})">Sign in</a>
+        </div>
+    } else {
+        <form method="post" asp-controller="Reservations" asp-action="Create" class="ul-reserve-card ul-enter" id="reserveForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="tripId" value="@Model.Id" />
+            <div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+                <div>
+                    <div class="ul-section-sub">/ Per seat</div>
+                    <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:700;line-height:1;margin-top:0.25rem;">
+                        @Model.Price.ToString("0.##") <span style="font-size:1.2rem;color:var(--text-mid);">BGN</span>
+                    </div>
+                </div>
+                <span class="ul-pill ul-pill-cyan">@seatsLeft seat@(seatsLeft==1?"":"s") left</span>
+            </div>
+            <div class="ul-form-row">
+                <label>How many seats?</label>
+                <div class="ul-seats" id="reserveSeats">
+                    @for (int i = 1; i <= Math.Min(seatsLeft, 6); i++) {
+                        <button type="button" class="ul-seat-btn @(i==1?"active":"")" data-seats="@i">@i</button>
+                    }
+                </div>
+                <input type="hidden" name="seatsCount" id="reserveSeatsInput" value="1" />
+                <div id="reserveTotalLine" style="margin-top:0.5rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--accent-amber);">Total: @Model.Price.ToString("0.##") BGN</div>
+            </div>
+            <div class="ul-form-row" style="margin-bottom:0;">
+                <label>Pay with</label>
+                <div class="ul-pay-options">
+                    <label class="ul-pay-option"><input type="radio" name="paymentMethod" value="0" checked /><span class="ul-pay-option-icon">💵</span><span>Cash</span></label>
+                    <label class="ul-pay-option"><input type="radio" name="paymentMethod" value="1" /><span class="ul-pay-option-icon">📱</span><span>Revolut</span></label>
+                    <label class="ul-pay-option"><input type="radio" name="paymentMethod" value="2" /><span class="ul-pay-option-icon">🏦</span><span>Bank</span></label>
+                </div>
+            </div>
+            <button type="submit" class="ul-btn ul-btn-success" style="width:100%;justify-content:center;margin-top:1.25rem;" id="reserveBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Reserve 1 seat — @Model.Price.ToString("0.##") BGN
+            </button>
+            <p style="font-size:0.78rem;color:var(--text-lo);margin:0.6rem 0 0;text-align:center;">Payment is settled directly with the driver.</p>
+        </form>
+    }
+}
+
+@{
+    var ratings     = ViewBag.Ratings as List<DriverRating> ?? new();
+    var alreadyRated = (bool)(ViewBag.AlreadyRated ?? false);
+}
+
+@if (Model.IsCompleted && Model.Driver != null) {
+    <div class="ul-section-head" style="margin-top:2rem;">
+        <div><div class="ul-section-sub">/ Passenger reviews</div><h2>Driver ratings</h2></div>
+        @if (ratings.Any()) {
+            <span class="ul-pill ul-pill-amber">★ @Model.Driver.AverageRating.ToString("0.#") · @ratings.Count review@(ratings.Count==1?"":"")</span>
+        }
+    </div>
+
+    @if (isAuthed && !isDriver && alreadyReserved && !alreadyRated) {
+        <div class="ul-reserve-card ul-enter" style="margin-bottom:1.25rem;">
+            <h3 style="margin:0 0 0.85rem;font-size:1.05rem;">Rate this driver</h3>
+            <form method="post" asp-controller="Ratings" asp-action="Submit">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tripId" value="@Model.Id" />
+                <div class="ul-star-picker" id="detailStarPicker">
+                    @for (int s = 1; s <= 5; s++) {
+                        <button type="button" class="ul-star-btn active" data-star="@s">★</button>
+                    }
+                </div>
+                <input type="hidden" name="stars" id="detailStarsInput" value="5" />
+                <textarea name="comment" class="ul-input ul-textarea" placeholder="Optional comment…" style="margin-top:0.75rem;min-height:60px;"></textarea>
+                <button type="submit" class="ul-btn ul-btn-success" style="margin-top:0.85rem;">Submit rating</button>
+            </form>
+        </div>
+    }
+
+    @if (ratings.Any()) {
+        <div class="ul-stagger">
+        @foreach (var r in ratings) {
+            var rn = r.Rater?.FullName ?? r.Rater?.Email ?? "Passenger";
+            var rv = r.Rater; var rav = AV(r.RaterId);
+            <div class="ul-message">
+                <div class="ul-message-head">
+                    <div class="ul-avatar @rav" style="overflow:hidden;padding:0;">
+                        @if(rv!=null&&!string.IsNullOrEmpty(rv.ProfilePicture)){ <img src="@rv.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(rn) }
+                    </div>
+                    <div style="flex:1;">
+                        <span class="ul-message-author">@rn</span>
+                        <div class="ul-message-time" style="margin-left:0;">@r.CreatedOn.ToString("MMM d · HH:mm")</div>
+                    </div>
+                    <span class="ul-rating-tag" style="font-size:1rem;">@string.Concat(Enumerable.Repeat("★",r.Stars))@string.Concat(Enumerable.Repeat("☆",5-r.Stars))</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(r.Comment)) { <div class="ul-message-body">@r.Comment</div> }
+            </div>
+        }
+        </div>
+    } else {
+        <div class="ul-empty"><div class="ul-empty-icon">⭐</div><p>No reviews yet for this trip.</p></div>
+    }
+}
+
+@if (Model.Event != null) {    <div class="ul-section-head" style="margin-top:2rem;"><div><div class="ul-section-sub">/ This trip is for</div><h2>Linked event</h2></div></div>
+    <a class="ul-card-link ul-enter" asp-controller="Events" asp-action="Details" asp-route-id="@Model.Event.Id">
+        <article class="ul-card ul-event-card">
+            <div class="ul-event-date"><div class="ul-event-date-day">@Model.Event.EventDate.ToString("dd")</div><div class="ul-event-date-month">@Model.Event.EventDate.ToString("MMM")</div></div>
+            <div class="ul-event-body"><h3>@Model.Event.Title</h3><div class="ul-event-meta"><span class="ul-event-meta-item">📍 @Model.Event.Location</span><span class="ul-event-meta-item">🕒 @Model.Event.EventDate.ToString("dddd, MMM d · HH:mm")</span></div></div>
+        </article>
+    </a>
+}
+
+<div class="ul-section-head" style="margin-top:2rem;"><div><div class="ul-section-sub">/ Navigate</div><h2>Open directions</h2></div></div>
+<div class="ul-nav-launchers ul-enter" id="navLaunchers" data-from="@Model.FromLocation" data-to="@Model.ToLocation">
+    <a class="ul-nav-launcher ul-nav-launcher-google" id="launchGoogle" href="#" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <div><div class="ul-nav-launcher-name">Google Maps</div><div class="ul-nav-launcher-desc">@Model.FromLocation → @Model.ToLocation</div></div>
+        <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+    <a class="ul-nav-launcher ul-nav-launcher-waze" id="launchWaze" href="#" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.24 2.65 7.86 6.39 9.29L12 22l3.61-.71C19.35 19.86 22 16.24 22 12c0-5.52-4.48-10-10-10z"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M9 15c.83.84 2.05 1 3 1s2.17-.16 3-1"/></svg>
+        <div><div class="ul-nav-launcher-name">Waze</div><div class="ul-nav-launcher-desc">Opens Waze navigation</div></div>
+        <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+    <a class="ul-nav-launcher ul-nav-launcher-apple" id="launchApple" href="#" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div><div class="ul-nav-launcher-name">Apple Maps</div><div class="ul-nav-launcher-desc">Opens Maps on iOS / Mac</div></div>
+        <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+</div>
+
+@section Scripts {
+<script>
+(function(){
+    // Detail page star picker
+    var picker = document.getElementById('detailStarPicker');
+    var input  = document.getElementById('detailStarsInput');
+    if (picker) {
+        var btns = picker.querySelectorAll('.ul-star-btn');
+        var current = 5;
+        function paint(n){ btns.forEach(function(b,i){ b.classList.toggle('active', i<n); }); }
+        paint(current);
+        picker.addEventListener('click', function(e){ var b=e.target.closest('.ul-star-btn'); if(!b)return; current=parseInt(b.dataset.star,10); input.value=current; paint(current); });
+        picker.addEventListener('mouseover', function(e){ var b=e.target.closest('.ul-star-btn'); if(!b)return; paint(parseInt(b.dataset.star,10)); });
+        picker.addEventListener('mouseleave', function(){ paint(current); });
+    }
+
+    // Nav launchers
+    var el=document.getElementById('navLaunchers');
+    if(el){
+        var enc=encodeURIComponent,f=el.dataset.from,t=el.dataset.to;
+        document.getElementById('launchGoogle').href='https://www.google.com/maps/dir/?api=1&origin='+enc(f)+'&destination='+enc(t)+'&travelmode=driving';
+        document.getElementById('launchWaze').href='https://waze.com/ul?q='+enc(t)+'&navigate=yes';
+        document.getElementById('launchApple').href='https://maps.apple.com/?saddr='+enc(f)+'&daddr='+enc(t)+'&dirflg=d';
+    }
+    // Multi-seat
+    var picker=document.getElementById('reserveSeats');
+    var input=document.getElementById('reserveSeatsInput');
+    var btn=document.getElementById('reserveBtn');
+    var tot=document.getElementById('reserveTotalLine');
+    var price=@Model.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    if(picker){ picker.addEventListener('click',function(e){ var b=e.target.closest('.ul-seat-btn'); if(!b)return; e.preventDefault(); var n=parseInt(b.dataset.seats,10); input.value=n; picker.querySelectorAll('.ul-seat-btn').forEach(function(x){x.classList.toggle('active',x===b);}); var total=(price*n).toFixed(2); if(tot)tot.textContent='Total: '+total+' BGN'; if(btn)btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Reserve '+n+' seat'+(n>1?'s':'')+' — '+total+' BGN'; }); }
+})();
+</script>
+}

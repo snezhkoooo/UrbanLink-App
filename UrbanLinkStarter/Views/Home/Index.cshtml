@@ -1,0 +1,168 @@
+@{
+    ViewData["Title"] = "Home";
+    var trips = ViewBag.Trips as List<Trip> ?? new();
+    var eventsList = ViewBag.Events as List<Event> ?? new();
+}
+
+<section class="ul-hero">
+    <div class="ul-hero-content">
+        <span class="ul-hero-eyebrow">Live · Ride · Connect</span>
+        <h1>
+            Move through the city,<br />
+            <span class="accent">together.</span>
+        </h1>
+        <p>
+            UrbanLink pairs everyday trips with the people going your way — share a ride,
+            split the cost, and stumble into events worth showing up for.
+        </p>
+        <div class="ul-hero-actions">
+            <a class="ul-btn ul-btn-primary" asp-controller="Trips" asp-action="Index">
+                Browse trips
+                <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </a>
+            <a class="ul-btn ul-btn-secondary" asp-controller="Events" asp-action="Index">
+                See what's on
+            </a>
+        </div>
+    </div>
+
+    <svg class="ul-hero-glyph" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+            <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ff6a3d" stop-opacity="0.7"/>
+                <stop offset="100%" stop-color="#ff3d8a" stop-opacity="0.0"/>
+            </linearGradient>
+            <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4ee0b0" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#58c8ff" stop-opacity="0.0"/>
+            </linearGradient>
+        </defs>
+        <circle cx="160" cy="160" r="130" fill="none" stroke="url(#g1)" stroke-width="1.2"/>
+        <circle cx="160" cy="160" r="100" fill="none" stroke="url(#g2)" stroke-width="1.2"/>
+        <circle cx="160" cy="160" r="70"  fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+        <circle cx="160" cy="160" r="40"  fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        <circle cx="160" cy="30" r="5" fill="#ff6a3d"/>
+        <circle cx="290" cy="160" r="4" fill="#4ee0b0"/>
+        <circle cx="160" cy="290" r="3" fill="#ffb547"/>
+        <circle cx="30" cy="160" r="4" fill="#58c8ff"/>
+    </svg>
+</section>
+
+<div class="ul-grid ul-grid-2">
+    <section>
+        <div class="ul-section-head">
+            <div>
+                <div class="ul-section-sub">/ Headed out</div>
+                <h2>Upcoming trips</h2>
+            </div>
+            <a class="ul-trip-card-link" asp-controller="Trips" asp-action="Index">
+                See all
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        @if (trips.Any())
+        {
+            <div class="ul-grid ul-stagger" style="gap: 1rem;">
+            @foreach (var trip in trips)
+            {
+                <a class="ul-card-link" asp-controller="Trips" asp-action="Details" asp-route-id="@trip.Id">
+                    <article class="ul-card ul-trip-card">
+                        <div class="ul-trip-card-head">
+                            <h3 class="ul-trip-card-title">@trip.Title</h3>
+                            <span class="ul-trip-card-price">@trip.Price.ToString("0.##") €</span>
+                        </div>
+
+                        <div class="ul-route">
+                            <div class="ul-route-stop">
+                                <div class="ul-route-stop-label">From</div>
+                                <div class="ul-route-stop-name">@trip.FromLocation</div>
+                            </div>
+                            <div class="ul-route-line"></div>
+                            <div class="ul-route-stop" style="text-align:right;">
+                                <div class="ul-route-stop-label">To</div>
+                                <div class="ul-route-stop-name">@trip.ToLocation</div>
+                            </div>
+                        </div>
+
+                        <div class="ul-trip-meta">
+                            <span class="ul-trip-meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                                @trip.TravelDate.ToString("ddd, MMM d · HH:mm")
+                            </span>
+                            <span class="ul-trip-meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                                @trip.AvailableSeats seats left
+                            </span>
+                            @if (trip.Event != null)
+                            {
+                                <span class="ul-trip-meta-item" style="color: var(--accent-mint);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    @trip.Event.Title
+                                </span>
+                            }
+                        </div>
+                    </article>
+                </a>
+            }
+            </div>
+        }
+        else
+        {
+            <div class="ul-empty">
+                <div class="ul-empty-icon">🛣️</div>
+                <p>No trips on the board yet — be the first to post one.</p>
+            </div>
+        }
+    </section>
+
+    <section>
+        <div class="ul-section-head">
+            <div>
+                <div class="ul-section-sub">/ Around town</div>
+                <h2>Upcoming events</h2>
+            </div>
+            <a class="ul-trip-card-link" asp-controller="Events" asp-action="Index">
+                See all
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        @if (eventsList.Any())
+        {
+            <div class="ul-grid ul-stagger" style="gap: 1rem;">
+            @foreach (var item in eventsList)
+            {
+                <a class="ul-card-link" asp-controller="Events" asp-action="Details" asp-route-id="@item.Id">
+                    <article class="ul-card ul-event-card">
+                        <div class="ul-event-date">
+                            <div class="ul-event-date-day">@item.EventDate.ToString("dd")</div>
+                            <div class="ul-event-date-month">@item.EventDate.ToString("MMM")</div>
+                        </div>
+                        <div class="ul-event-body">
+                            <h3>@item.Title</h3>
+                            <div class="ul-event-meta">
+                                <span class="ul-event-meta-item">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    @item.Location
+                                </span>
+                                <span class="ul-event-meta-item">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                                    @item.EventDate.ToString("HH:mm")
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                </a>
+            }
+            </div>
+        }
+        else
+        {
+            <div class="ul-empty">
+                <div class="ul-empty-icon">🎫</div>
+                <p>Nothing scheduled — but the city never really sleeps.</p>
+            </div>
+        }
+    </section>
+</div>

@@ -1,0 +1,67 @@
+@model IEnumerable<Event>
+@{
+    ViewData["Title"] = "Events";
+    var isAdmin = User.IsInRole("Admin");
+}
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Around the city</div>
+        <h2>Events</h2>
+    </div>
+    @if (isAdmin)
+    {
+        <a class="ul-btn ul-btn-primary" asp-action="Create">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Create event
+        </a>
+    }
+</div>
+
+@if (Model.Any())
+{
+    <div class="ul-grid ul-grid-2 ul-stagger">
+    @foreach (var item in Model)
+    {
+        <a class="ul-card-link" asp-action="Details" asp-route-id="@item.Id">
+            <article class="ul-card ul-event-card">
+                <div class="ul-event-date">
+                    <div class="ul-event-date-day">@item.EventDate.ToString("dd")</div>
+                    <div class="ul-event-date-month">@item.EventDate.ToString("MMM")</div>
+                </div>
+                <div class="ul-event-body">
+                    <h3>@item.Title</h3>
+                    <div class="ul-event-meta" style="margin-bottom: 0.6rem;">
+                        <span class="ul-event-meta-item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            @item.Location
+                        </span>
+                        <span class="ul-event-meta-item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            @item.EventDate.ToString("HH:mm")
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                    {
+                        <p style="margin: 0.4rem 0 0; font-size: 0.92rem; color: var(--text-mid); line-height: 1.5;">@item.Description</p>
+                    }
+                </div>
+            </article>
+        </a>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty ul-enter">
+        <div class="ul-empty-icon">🎫</div>
+        @if (isAdmin)
+        {
+            <p>No events posted yet. Got something cool happening? <strong>Create one.</strong></p>
+        }
+        else
+        {
+            <p>No events scheduled yet — check back soon.</p>
+        }
+    </div>
+}

@@ -1,0 +1,114 @@
+@model IEnumerable<UrbanLinkStarter.Models.VerificationRequest>
+@{
+    ViewData["Title"] = "Verifications";
+    var pending  = Model.Where(v => v.Status == UrbanLinkStarter.Models.VerificationStatus.Pending).ToList();
+    var reviewed = Model.Where(v => v.Status != UrbanLinkStarter.Models.VerificationStatus.Pending).ToList();
+
+    string DocLabel(UrbanLinkStarter.Models.DocumentType d) => d switch
+    {
+        UrbanLinkStarter.Models.DocumentType.NationalId => "🪪 National ID",
+        UrbanLinkStarter.Models.DocumentType.DriversLicense => "🚗 Driver's license",
+        UrbanLinkStarter.Models.DocumentType.Passport => "📘 Passport",
+        UrbanLinkStarter.Models.DocumentType.Revolut => "💳 Revolut",
+        _ => d.ToString()
+    };
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Dashboard
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Control room · Verifications</div>
+        <h2>Review identity submissions</h2>
+    </div>
+    <span class="ul-pill ul-pill-amber">@pending.Count pending</span>
+</div>
+
+@if (pending.Any())
+{
+    <div class="ul-grid ul-stagger" style="gap:1rem;">
+    @foreach (var r in pending)
+    {
+        <article class="ul-card">
+            <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
+                <div style="flex:1; min-width: 220px;">
+                    <h3 class="ul-trip-card-title">@(r.User?.FullName ?? r.User?.Email ?? "Unknown")</h3>
+                    <div style="font-family: var(--font-mono); font-size:0.78rem; color:var(--text-lo); margin-top: 4px;">@(r.User?.Email)</div>
+                    <div style="margin-top: 0.5rem;">
+                        <span class="ul-pill ul-pill-cyan">@DocLabel(r.DocumentType)</span>
+                        <span style="color: var(--text-lo); font-size:0.82rem; margin-left:0.5rem;">submitted @r.CreatedOn.ToString("MMM d · HH:mm")</span>
+                    </div>
+                    @if (r.User != null)
+                    {
+                        <div style="margin-top: 0.5rem; font-size:0.9rem; color:var(--text-mid);">Stated age: <strong>@r.User.Age</strong></div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(r.DocumentImage))
+                {
+                    <a href="@r.DocumentImage" target="_blank" rel="noopener" style="flex:0 0 auto;">
+                        <img src="@r.DocumentImage" alt="Document" style="max-width:200px; max-height:140px; border-radius:10px; border:1px solid var(--border); object-fit:cover;" />
+                    </a>
+                }
+            </div>
+
+            <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap: wrap;">
+                <form method="post" asp-action="ApproveVerification" asp-route-id="@r.Id" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="ul-btn ul-btn-success ul-btn-sm">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        Approve
+                    </button>
+                </form>
+                <form method="post" asp-action="RejectVerification" asp-route-id="@r.Id" style="margin:0; display:flex; gap:0.5rem; align-items:center;">
+                    @Html.AntiForgeryToken()
+                    <input name="note" class="ul-input" placeholder="Reason (optional)" style="padding:0.5rem 0.75rem; font-size:0.85rem; min-width:200px;" />
+                    <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color: var(--accent-magenta);">Reject</button>
+                </form>
+            </div>
+        </article>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty"><div class="ul-empty-icon">✅</div><p>No pending requests right now.</p></div>
+}
+
+@if (reviewed.Any())
+{
+    <div class="ul-section-head" style="margin-top:2rem;">
+        <div>
+            <div class="ul-section-sub">/ History</div>
+            <h2>Reviewed</h2>
+        </div>
+    </div>
+    <div class="ul-table-wrap">
+        <table class="ul-table">
+            <thead><tr><th>User</th><th>Document</th><th>Reviewed</th><th>Result</th></tr></thead>
+            <tbody>
+            @foreach (var r in reviewed)
+            {
+                <tr>
+                    <td class="ul-cell-strong">@(r.User?.FullName ?? r.User?.Email)</td>
+                    <td>@DocLabel(r.DocumentType)</td>
+                    <td>@(r.ReviewedOn?.ToString("MMM d · HH:mm") ?? "—")</td>
+                    <td>
+                        @if (r.Status == UrbanLinkStarter.Models.VerificationStatus.Approved)
+                        {
+                            <span class="ul-pill ul-pill-mint">✓ Approved</span>
+                        }
+                        else
+                        {
+                            <span class="ul-pill ul-pill-amber" style="background:rgba(255,61,138,0.1);color:var(--accent-magenta);border-color:rgba(255,61,138,0.3);">✗ Rejected</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,73 @@
+@model IEnumerable<Event>
+@{
+    ViewData["Title"] = "Manage events";
+    var tripCounts = ViewBag.TripCounts as Dictionary<int, int> ?? new();
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Dashboard
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Control room · Events</div>
+        <h2>Manage events</h2>
+    </div>
+    <div style="display:flex; gap:0.75rem; align-items:center;">
+        <span class="ul-pill ul-pill-cyan">@Model.Count() total</span>
+        <a class="ul-btn ul-btn-primary" asp-controller="Events" asp-action="Create">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            New event
+        </a>
+    </div>
+</div>
+
+@if (Model.Any())
+{
+    <div class="ul-table-wrap ul-enter">
+        <table class="ul-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Location</th>
+                    <th>Date</th>
+                    <th>Trips</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var ev in Model)
+            {
+                var tcount = tripCounts.TryGetValue(ev.Id, out var c) ? c : 0;
+                <tr>
+                    <td class="ul-cell-strong">@ev.Title</td>
+                    <td>@ev.Location</td>
+                    <td>@ev.EventDate.ToString("MMM d, yyyy · HH:mm")</td>
+                    <td><span class="ul-pill ul-pill-mint">@tcount</span></td>
+                    <td>
+                        <div class="ul-row-actions">
+                            <a class="ul-row-action" asp-controller="Events" asp-action="Details" asp-route-id="@ev.Id" title="View">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </a>
+                            <a class="ul-row-action ul-row-action-edit" asp-action="EditEvent" asp-route-id="@ev.Id" title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </a>
+                            <form method="post" asp-action="DeleteEvent" asp-route-id="@ev.Id" style="margin:0;" data-confirm-msg="Delete this event? Linked trips will become standalone.">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="ul-row-action ul-row-action-delete" title="Delete">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="ul-empty ul-enter"><div class="ul-empty-icon">🎫</div><p>No events yet.</p></div>
+}

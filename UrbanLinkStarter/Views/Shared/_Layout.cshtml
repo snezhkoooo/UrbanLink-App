@@ -1,0 +1,294 @@
+@using Microsoft.AspNetCore.Identity
+@using UrbanLinkStarter.Models
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@{
+    var cc = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var cp = (ViewContext.RouteData.Values["page"]?.ToString() ?? "").ToLower();
+    string Active(string c) => string.Equals(cc, c, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    string ActivePage(string s) => cp.Contains(s) ? "active" : "";
+
+    var isSignedIn = SignInManager.IsSignedIn(User);
+    string? userName = null;
+    string? profilePic = null;
+    string initials = "U";
+    if (isSignedIn)
+    {
+        var u = await UserManager.GetUserAsync(User);
+        userName   = u?.FullName;
+        profilePic = u?.ProfilePicture;
+        if (string.IsNullOrWhiteSpace(userName)) userName = u?.Email;
+        if (!string.IsNullOrWhiteSpace(userName))
+        {
+            var pp = userName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            initials = pp.Length == 1 ? pp[0][0].ToString().ToUpper() : (pp[0][0].ToString() + pp[^1][0].ToString()).ToUpper();
+        }
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - UrbanLink</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="~/js/place-suggest.js" asp-append-version="true" defer></script>
+    <script src="~/js/time-wheel.js" asp-append-version="true" defer></script>
+</head>
+<body>
+    <nav class="ul-nav">
+        <div class="ul-nav-inner">
+            <a class="ul-brand" asp-controller="Home" asp-action="Index">
+                <span class="ul-brand-dot"></span>UrbanLink
+            </a>
+
+            <button class="ul-hamburger" id="hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="ul-nav-links" id="navLinks">
+                <a class="ul-nav-link @Active("Home")"   asp-controller="Home"   asp-action="Index">Home</a>
+                <a class="ul-nav-link @Active("Trips")"  asp-controller="Trips"  asp-action="Index">Find a Trip</a>
+                <a class="ul-nav-link @Active("Events")" asp-controller="Events" asp-action="Index">Events</a>
+                <a class="ul-nav-link @Active("Chat")"   asp-controller="Chat"   asp-action="Index">Chat</a>
+                @if (isSignedIn && User.IsInRole("Admin"))
+                {
+                    <a class="ul-nav-link @Active("Admin")" asp-controller="Admin" asp-action="Index">Admin</a>
+                }
+            </div>
+
+            <div class="ul-nav-auth">
+                @if (isSignedIn)
+                {
+                    <div class="ul-user-dropdown" id="userDropdown">
+                        <button class="ul-nav-user ul-user-dropdown-toggle" type="button">
+                            <div class="ul-avatar ul-avatar-sunset" style="width:32px;height:32px;font-size:0.8rem;overflow:hidden;padding:0;">
+                                @if (!string.IsNullOrEmpty(profilePic))
+                                {
+                                    <img src="@profilePic" alt="@userName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                }
+                                else { @initials }
+                            </div>
+                            <span class="ul-nav-user-name">@userName</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-left:2px;transition:transform 0.2s;"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="ul-dropdown-menu" role="menu">
+                            <a class="ul-dropdown-item" asp-controller="Profile" asp-action="Index">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                My Profile
+                            </a>
+                            <a class="ul-dropdown-item" asp-controller="Reservations" asp-action="MyTrips">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17h2l1.5-4.5L9 6h6l2.5 6.5L19 17h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                                My Trips
+                            </a>
+                            <a class="ul-dropdown-item" asp-controller="Reservations" asp-action="Index">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                My Reservations
+                            </a>
+                            <div class="ul-dropdown-sep"></div>
+                            <form method="post" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" style="margin:0;">
+                                <button type="submit" class="ul-dropdown-item ul-dropdown-item-danger">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                                    Sign out
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a class="ul-nav-link @ActivePage("login")" asp-area="Identity" asp-page="/Account/Login">Sign in</a>
+                    <a class="ul-btn ul-btn-primary ul-btn-sm" asp-area="Identity" asp-page="/Account/Register">Sign up</a>
+                }
+            </div>
+        </div>
+    </nav>
+
+    @* ===== Custom confirm modal ===== *@
+    <div id="ul-confirm-overlay" class="ul-confirm-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="ul-confirm-box ul-enter">
+            <p id="ul-confirm-text" class="ul-confirm-msg"></p>
+            <div class="ul-confirm-actions">
+                <button id="ul-confirm-ok"     class="ul-btn ul-btn-primary">Confirm</button>
+                <button id="ul-confirm-cancel" class="ul-btn ul-btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    @* ===== Admin pending verifications popup ===== *@
+    @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+    {
+        var adminPending = (int)(ViewBag.AdminPendingCount ?? 0);
+        if (adminPending > 0)
+        {
+            <div id="admin-pending-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+                <div class="ul-confirm-box ul-enter" style="max-width:420px;text-align:center;">
+                    <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent-amber),var(--accent-orange));display:flex;align-items:center;justify-content:center;">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3 style="margin:0 0 0.5rem;color:var(--text-hi);">@adminPending pending submission@(adminPending == 1 ? "" : "s")</h3>
+                    <p style="color:var(--text-mid);margin:0 0 1.5rem;">There @(adminPending == 1 ? "is" : "are") @adminPending identity verification request@(adminPending == 1 ? "" : "s") waiting for your review.</p>
+                    <div style="display:flex;gap:0.75rem;justify-content:center;">
+                        <a class="ul-btn ul-btn-primary" asp-controller="Admin" asp-action="Verifications" onclick="document.getElementById('admin-pending-popup').style.display='none';">Go to Submissions</a>
+                        <button class="ul-btn ul-btn-secondary" onclick="document.getElementById('admin-pending-popup').style.display='none';">Later</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ===== Driver rating popup ===== *@
+    @{
+        var pendingRatingTrip = ViewBag.PendingRatingTrip as UrbanLinkStarter.Models.Trip;
+    }
+    @if (pendingRatingTrip != null)
+    {
+        <div id="rating-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+            <div class="ul-confirm-box ul-enter" style="max-width:440px;text-align:center;">
+                <div style="margin:0 auto 1rem;font-size:2.5rem;">🚗</div>
+                <h3 style="margin:0 0 0.5rem;color:var(--text-hi);">How was your ride?</h3>
+                <p style="color:var(--text-mid);margin:0 0 1.25rem;">Rate your driver for <strong>@pendingRatingTrip.Title</strong></p>
+                <form method="post" asp-controller="Ratings" asp-action="Submit" id="ratingForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tripId" value="@pendingRatingTrip.Id" />
+                    <div class="ul-star-picker" id="starPicker">
+                        @for (int s = 1; s <= 5; s++) {
+                            <button type="button" class="ul-star-btn" data-star="@s" title="@s star@(s>1?"s":"")">★</button>
+                        }
+                    </div>
+                    <input type="hidden" name="stars" id="starsInput" value="5" />
+                    <textarea name="comment" class="ul-input ul-textarea" placeholder="Optional comment…" style="margin-top:0.85rem;min-height:70px;"></textarea>
+                    <div style="display:flex;gap:0.75rem;justify-content:center;margin-top:1.25rem;">
+                        <button type="submit" class="ul-btn ul-btn-success">Submit rating</button>
+                        <button type="button" class="ul-btn ul-btn-secondary" onclick="document.getElementById('rating-popup').style.display='none';">Skip for now</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script>
+        (function(){
+            var picker = document.getElementById('starPicker');
+            var input  = document.getElementById('starsInput');
+            var btns   = picker ? picker.querySelectorAll('.ul-star-btn') : [];
+            var current = 5;
+
+            function paint(n) {
+                btns.forEach(function(b, i) { b.classList.toggle('active', i < n); });
+            }
+            paint(current);
+
+            picker && picker.addEventListener('click', function(e){
+                var b = e.target.closest('.ul-star-btn'); if(!b) return;
+                current = parseInt(b.dataset.star, 10);
+                input.value = current;
+                paint(current);
+            });
+            picker && picker.addEventListener('mouseover', function(e){
+                var b = e.target.closest('.ul-star-btn'); if(!b) return;
+                paint(parseInt(b.dataset.star, 10));
+            });
+            picker && picker.addEventListener('mouseleave', function(){ paint(current); });
+        })();
+        </script>
+    }
+    @{
+        var verPopup = ViewBag.VerificationPopup as string;
+    }
+    @if (!string.IsNullOrEmpty(verPopup))
+    {
+        <div id="verif-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+            <div class="ul-confirm-box ul-enter" style="max-width:460px; text-align:center;">
+                @if (verPopup == "Approved")
+                {
+                    <div style="margin: 0 auto 1rem; width:64px; height:64px; border-radius:50%; background: linear-gradient(135deg,#58c8ff,#3b82f6); display:flex; align-items:center; justify-content:center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem; color: var(--text-hi);">You're verified! 🎉</h3>
+                    <p style="color: var(--text-mid); margin: 0 0 1.5rem;">Your identity has been confirmed. You now have the blue tick next to your name.</p>
+                    <button class="ul-btn ul-btn-success" style="width:100%; justify-content:center;" onclick="document.getElementById('verif-popup').style.display='none';">Fantastic!</button>
+                }
+                else
+                {
+                    <div style="margin: 0 auto 1rem; width:64px; height:64px; border-radius:50%; background: linear-gradient(135deg,#ff3d8a,#dc2626); display:flex; align-items:center; justify-content:center;">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem; color: var(--text-hi);">Verification not approved</h3>
+                    <p style="color: var(--text-mid); margin: 0 0 1.5rem;">Unfortunately your document couldn't be verified. You can try again with a clearer image.</p>
+                    <div style="display:flex; gap:0.75rem; justify-content:center;">
+                        <a class="ul-btn ul-btn-primary" asp-controller="Verification" asp-action="Index">Try again?</a>
+                        <button class="ul-btn ul-btn-secondary" onclick="document.getElementById('verif-popup').style.display='none';">No, Thank You</button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <main class="ul-page">
+        @RenderBody()
+    </main>
+
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+    // ---- Hamburger menu ----
+    (function () {
+        var btn   = document.getElementById('hamburger');
+        var links = document.getElementById('navLinks');
+        if (!btn || !links) return;
+        btn.addEventListener('click', function () {
+            links.classList.toggle('open');
+            btn.classList.toggle('open');
+        });
+    })();
+
+    // ---- Dropdown ----
+    (function () {
+        var dd = document.getElementById('userDropdown');
+        if (!dd) return;
+        var toggle = dd.querySelector('.ul-user-dropdown-toggle');
+        var menu   = dd.querySelector('.ul-dropdown-menu');
+        var chev   = toggle ? toggle.querySelector('svg:last-child') : null;
+
+        function openMenu()  { menu.classList.add('open');    toggle.setAttribute('aria-expanded','true');  if(chev) chev.style.transform='rotate(180deg)'; }
+        function closeMenu() { menu.classList.remove('open'); toggle.setAttribute('aria-expanded','false'); if(chev) chev.style.transform=''; }
+
+        toggle.addEventListener('click', function(e){ e.stopPropagation(); menu.classList.contains('open') ? closeMenu() : openMenu(); });
+        document.addEventListener('click', function(e){ if(!dd.contains(e.target)) closeMenu(); });
+        document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeMenu(); });
+    })();
+
+    // ---- Custom confirm ----
+    (function () {
+        var overlay   = document.getElementById('ul-confirm-overlay');
+        var msgEl     = document.getElementById('ul-confirm-text');
+        var okBtn     = document.getElementById('ul-confirm-ok');
+        var cancelBtn = document.getElementById('ul-confirm-cancel');
+        var _resolve;
+
+        window.ulConfirm = function(msg) {
+            return new Promise(function(res){
+                _resolve = res;
+                msgEl.textContent = msg;
+                overlay.style.display = 'flex';
+                okBtn.focus();
+            });
+        };
+        okBtn.addEventListener('click',     function(){ overlay.style.display='none'; if(_resolve) _resolve(true); });
+        cancelBtn.addEventListener('click', function(){ overlay.style.display='none'; if(_resolve) _resolve(false); });
+        overlay.addEventListener('click',   function(e){ if(e.target===overlay){ overlay.style.display='none'; if(_resolve) _resolve(false); } });
+
+        // Intercept data-confirm-msg forms
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            var msg  = form.dataset.confirmMsg;
+            if (!msg) return;
+            e.preventDefault();
+            window.ulConfirm(msg).then(function(ok){ if(ok){ form.removeAttribute('data-confirm-msg'); form.submit(); } });
+        }, true);
+    })();
+    </script>
+</body>
+</html>

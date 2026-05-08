@@ -1,0 +1,119 @@
+@model Event
+@{
+    ViewData["Title"] = "Create event";
+    var initDate = DateTime.Now.AddDays(1).ToString("yyyy-MM-dd");
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    All events
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ New listing</div>
+        <h2>Post an event</h2>
+    </div>
+</div>
+
+<form method="post" class="ul-form-card">
+    <div class="ul-form-row">
+        <label asp-for="Title">Title</label>
+        <input asp-for="Title" class="ul-input" placeholder="e.g. Sunset rooftop session" />
+    </div>
+    <div class="ul-form-row">
+        <label asp-for="Description">Description</label>
+        <textarea asp-for="Description" class="ul-textarea" placeholder="What's the vibe? Any details?"></textarea>
+    </div>
+    <div class="ul-form-row">
+        <label asp-for="Location">Location</label>
+        <input asp-for="Location" class="ul-input" placeholder="Sofia" data-place-suggest />
+    </div>
+
+    <div class="ul-form-row" style="margin-top:1.2rem;">
+        <label>When is it?</label>
+
+        <div class="ul-quickpick" id="quickPick">
+            <button type="button" class="ul-chip" data-when="this-evening">This evening</button>
+            <button type="button" class="ul-chip" data-when="tomorrow-evening">Tomorrow night</button>
+            <button type="button" class="ul-chip" data-when="this-weekend">This weekend</button>
+        </div>
+
+        <div class="ul-wheel-row">
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Date</div>
+                <div data-date-wheel
+                     data-target="evHidDate"
+                     data-value="@initDate"
+                     data-combine-with="evHidden"
+                     data-time-input="evHidTime">
+                </div>
+            </div>
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Time (24h)</div>
+                <div data-time-wheel
+                     data-target="evHidTime"
+                     data-value="19:00"
+                     data-combine-with="evHidden"
+                     data-date-input="evHidDate">
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" id="evHidDate" value="@initDate" />
+        <input type="hidden" id="evHidTime" value="19:00" />
+        <input asp-for="EventDate" type="hidden" id="evHidden" value="@(initDate + "T19:00")" />
+        <span asp-validation-for="EventDate" class="ul-field-error"></span>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; margin-top:1.75rem;">
+        <button type="submit" class="ul-btn ul-btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Save event
+        </button>
+        <a class="ul-btn ul-btn-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var hidDate = document.getElementById('evHidDate');
+    var hidTime = document.getElementById('evHidTime');
+    var hidComb = document.getElementById('evHidden');
+
+    function syncCombined() {
+        if (hidDate.value && hidTime.value)
+            hidComb.value = hidDate.value + 'T' + hidTime.value;
+    }
+    hidDate.addEventListener('change', syncCombined);
+    hidTime.addEventListener('change', syncCombined);
+
+    function pad(n) { return String(n).padStart(2,'0'); }
+
+    document.getElementById('quickPick').addEventListener('click', function (e) {
+        var btn = e.target.closest('.ul-chip');
+        if (!btn) return;
+        e.preventDefault();
+        var d = new Date(); d.setSeconds(0,0);
+        switch (btn.dataset.when) {
+            case 'this-evening':     d.setHours(19,0); break;
+            case 'tomorrow-evening': d.setDate(d.getDate()+1); d.setHours(19,0); break;
+            case 'this-weekend':
+                var add=(6-d.getDay()+7)%7; if(add===0)add=7;
+                d.setDate(d.getDate()+add); d.setHours(20,0); break;
+        }
+        var dateStr = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+        var timeStr = pad(d.getHours())+':'+pad(Math.round(d.getMinutes()/5)*5);
+        hidDate.value=dateStr; hidTime.value=timeStr; syncCombined();
+        var dw=document.querySelector('[data-date-wheel]');
+        var tw=document.querySelector('[data-time-wheel]');
+        if(dw){dw.dataset.value=dateStr; delete dw.dataset.wheelInit; dw.innerHTML='';}
+        if(tw){tw.dataset.value=timeStr; delete tw.dataset.wheelInit; tw.innerHTML='';}
+        if(window.__wheelAttach) window.__wheelAttach();
+        document.querySelectorAll('#quickPick .ul-chip').forEach(function(c){c.classList.remove('active');});
+        btn.classList.add('active');
+    });
+});
+</script>
+}
