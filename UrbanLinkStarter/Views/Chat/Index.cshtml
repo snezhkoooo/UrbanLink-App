@@ -1,0 +1,203 @@
+@model IEnumerable<Message>
+@{
+    ViewData["Title"] = "Chat";
+    var adminIds    = ViewBag.AdminUserIds as HashSet<string> ?? new();
+    var likesDict   = ViewBag.Likes as Dictionary<int,List<MessageLike>> ?? new();
+    var repliesDict = ViewBag.Replies as Dictionary<int,List<Message>> ?? new();
+    var currentUserId = (string)(ViewBag.CurrentUserId ?? "");
+
+    string Initials(string? n){ if(string.IsNullOrWhiteSpace(n))return "U"; var p=n.Trim().Split(' ',StringSplitOptions.RemoveEmptyEntries); return p.Length==1?p[0][0].ToString().ToUpper():(p[0][0].ToString()+p[^1][0].ToString()).ToUpper(); }
+    string AV(string? k){ if(string.IsNullOrWhiteSpace(k))return ""; var c=new[]{"","ul-avatar-violet","ul-avatar-mint","ul-avatar-sunset"}; return c[Math.Abs(k.GetHashCode())%c.Length]; }
+}
+
+<div class="ul-section-head ul-enter">
+    <div><div class="ul-section-sub">/ The feed</div><h2>Community chat</h2></div>
+    @if (!string.IsNullOrEmpty(currentUserId)) {
+        <a class="ul-trip-card-link" asp-action="MyMessages">My messages →</a>
+    }
+</div>
+
+@if (TempData["ChatError"] != null) {
+    <div class="ul-auth-error ul-enter" style="margin-bottom:1rem;">@TempData["ChatError"]</div>
+}
+
+@if (User.Identity?.IsAuthenticated == true) {
+    <form method="post" asp-action="Create" enctype="multipart/form-data" class="ul-message-composer ul-enter" id="chatForm">
+        @Html.AntiForgeryToken()
+        <div class="ul-message-composer-row">
+            <input name="content" id="chatContent" class="ul-input" placeholder="Drop a thought, share a tip..." autocomplete="off" />
+            <label class="ul-btn ul-btn-secondary ul-btn-sm" for="chatImage" title="Attach image" style="cursor:pointer;padding:0.6rem 0.85rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </label>
+            <input type="file" id="chatImage" name="image" accept="image/*" style="display:none;" />
+            <button class="ul-btn ul-btn-primary" type="submit">
+                Post <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+        </div>
+        <div id="chatImagePreview" style="display:none;margin-top:0.6rem;align-items:center;gap:0.5rem;">
+            <img id="chatImageThumb" style="max-height:80px;max-width:180px;border-radius:8px;border:1px solid var(--border);" />
+            <button type="button" id="chatRemoveImage" class="ul-btn ul-btn-secondary ul-btn-sm" style="font-size:0.78rem;">✕ Remove</button>
+        </div>
+    </form>
+} else {
+    <div class="ul-card ul-enter" style="text-align:center;padding:1.5rem;">
+        <p style="margin:0 0 0.75rem;color:var(--text-mid);">Sign in to join the conversation.</p>
+        <a class="ul-btn ul-btn-primary" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Index","Chat")">Sign in</a>
+    </div>
+}
+
+@if (Model.Any()) {
+    <div class="ul-stagger" style="margin-top:0.75rem;">
+    @foreach (var m in Model) {
+        var u       = m.User;
+        var name    = u?.FullName ?? "User";
+        var variant = AV(m.UserId ?? name);
+        var isAdmin = u != null && adminIds.Contains(u.Id);
+        var msgLikes = likesDict.TryGetValue(m.Id, out var ll) ? ll : new();
+        var likeCount    = msgLikes.Count(x => x.IsLike);
+        var dislikeCount = msgLikes.Count(x => !x.IsLike);
+        var myReaction   = !string.IsNullOrEmpty(currentUserId) ? msgLikes.FirstOrDefault(x => x.UserId == currentUserId) : null;
+        var isOwn = u?.Id == currentUserId;
+        var msgReplies = repliesDict.TryGetValue(m.Id, out var rr) ? rr : new();
+
+        <div class="ul-message" data-msg-id="@m.Id">
+            <div class="ul-message-head">
+                <a class="ul-avatar @variant" asp-controller="Profile" asp-action="View" asp-route-id="@m.UserId" style="text-decoration:none;overflow:hidden;padding:0;">
+                    @if(u!=null&&!string.IsNullOrEmpty(u.ProfilePicture)){ <img src="@u.ProfilePicture" alt="@name" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(name) }
+                </a>
+                <div style="flex:1;">
+                    <a asp-controller="Profile" asp-action="View" asp-route-id="@m.UserId" style="text-decoration:none;">
+                        @if(u!=null){ @await Html.PartialAsync("_UserName",u,new ViewDataDictionary(ViewData){["ulShowAge"]=true,["ulIsAdmin"]=isAdmin}) }
+                        else { <span class="ul-message-author">@name</span> }
+                    </a>
+                    <div class="ul-message-time" style="margin-left:0;">@m.CreatedOn.ToString("MMM d · HH:mm")</div>
+                </div>
+                @if (isOwn) {
+                    <form method="post" asp-action="DeleteMessage" asp-route-id="@m.Id" style="margin:0;" data-confirm-msg="Delete your message?">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="ul-row-action ul-row-action-delete" title="Delete" style="opacity:0.6;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                        </button>
+                    </form>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(m.Content)) { <div class="ul-message-body">@m.Content</div> }
+            @if (!string.IsNullOrEmpty(m.ImageData)) {
+                <div style="margin-top:0.65rem;"><img src="@m.ImageData" style="max-width:100%;max-height:400px;border-radius:12px;border:1px solid var(--border);object-fit:contain;cursor:pointer;" onclick="window.open(this.src)" /></div>
+            }
+
+            @* Likes / Dislikes / Reply *@
+            <div class="ul-like-row">
+                @if (!string.IsNullOrEmpty(currentUserId)) {
+                    <button type="button" class="ul-like-btn @(myReaction?.IsLike==true?"active":"")" data-msg="@m.Id" data-is-like="true" title="Like">
+                        👍 <span class="ul-like-count">@likeCount</span>
+                    </button>
+                    <button type="button" class="ul-like-btn @(myReaction?.IsLike==false?"active":"")" data-msg="@m.Id" data-is-like="false" title="Dislike">
+                        👎 <span class="ul-like-count">@dislikeCount</span>
+                    </button>
+                    <button type="button" class="ul-like-btn ul-reply-toggle" data-reply-for="@m.Id" title="Reply">
+                        💬 Reply @(msgReplies.Any() ? "(" + msgReplies.Count + ")" : "")
+                    </button>
+                } else {
+                    <span class="ul-like-btn" style="cursor:default;">👍 <span>@likeCount</span></span>
+                    <span class="ul-like-btn" style="cursor:default;">👎 <span>@dislikeCount</span></span>
+                }
+            </div>
+
+            @* Replies *@
+            @if (msgReplies.Any() || !string.IsNullOrEmpty(currentUserId)) {
+                <div class="ul-replies" id="replies-@m.Id">
+                    @foreach (var reply in msgReplies) {
+                        var ru = reply.User; var rname = ru?.FullName ?? "User"; var rv = AV(reply.UserId ?? rname);
+                        var rIsOwn = reply.UserId == currentUserId;
+                        <div class="ul-reply">
+                            <a class="ul-avatar @rv" asp-controller="Profile" asp-action="View" asp-route-id="@reply.UserId" style="text-decoration:none;overflow:hidden;padding:0;width:28px;height:28px;font-size:0.65rem;flex-shrink:0;">
+                                @if(ru!=null&&!string.IsNullOrEmpty(ru.ProfilePicture)){ <img src="@ru.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(rname) }
+                            </a>
+                            <div style="flex:1;min-width:0;">
+                                <span style="font-weight:600;font-size:0.88rem;color:var(--text-hi);">@rname</span>
+                                <span class="ul-message-time" style="margin-left:0.35rem;">@reply.CreatedOn.ToString("MMM d · HH:mm")</span>
+                                <div style="font-size:0.9rem;color:var(--text-mid);margin-top:2px;">@reply.Content</div>
+                            </div>
+                            @if (rIsOwn) {
+                                <form method="post" asp-action="DeleteMessage" asp-route-id="@reply.Id" style="margin:0;" data-confirm-msg="Delete your reply?">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="ul-row-action ul-row-action-delete" style="opacity:0.5;width:26px;height:26px;" title="Delete">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(currentUserId)) {
+                        <form method="post" asp-action="Create" class="ul-reply-form" id="reply-form-@m.Id" style="display:none;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="parentId" value="@m.Id" />
+                            <div class="ul-reply-input-row">
+                                <input name="content" class="ul-input" placeholder="Write a reply…" maxlength="300" required />
+                                <button type="submit" class="ul-btn ul-btn-primary ul-btn-sm">Reply</button>
+                                <button type="button" class="ul-btn ul-btn-secondary ul-btn-sm ul-reply-cancel" data-for="@m.Id">Cancel</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+    }
+    </div>
+} else {
+    <div class="ul-empty ul-enter"><div class="ul-empty-icon">💬</div><p>No messages yet. Break the silence — say hello above.</p></div>
+}
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Image preview
+    var fi=document.getElementById('chatImage'), prev=document.getElementById('chatImagePreview'), thumb=document.getElementById('chatImageThumb'), rem=document.getElementById('chatRemoveImage');
+    if(fi){ fi.addEventListener('change',function(){ var f=fi.files[0]; if(!f)return; var r=new FileReader(); r.onload=function(e){ thumb.src=e.target.result; prev.style.display='flex'; }; r.readAsDataURL(f); }); }
+    if(rem){ rem.addEventListener('click',function(){ fi.value=''; thumb.src=''; prev.style.display='none'; }); }
+
+    // Toggle reply form
+    document.querySelectorAll('.ul-reply-toggle').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var id = btn.dataset.replyFor;
+            var form = document.getElementById('reply-form-'+id);
+            if (!form) return;
+            var isOpen = form.style.display !== 'none';
+            form.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) form.querySelector('input[name="content"]').focus();
+        });
+    });
+    document.querySelectorAll('.ul-reply-cancel').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var form = document.getElementById('reply-form-'+btn.dataset.for);
+            if(form) form.style.display='none';
+        });
+    });
+
+    // Likes AJAX
+    var token = document.querySelector('input[name="__RequestVerificationToken"]');
+    var csrf  = token ? token.value : '';
+    document.querySelectorAll('.ul-like-btn[data-msg]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var msgId  = btn.dataset.msg;
+            var isLike = btn.dataset.isLike === 'true';
+            fetch('/Chat/ToggleLike', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': csrf },
+                body: 'messageId='+msgId+'&isLike='+isLike+'&__RequestVerificationToken='+encodeURIComponent(csrf)
+            }).then(function(r){ return r.json(); }).then(function(d){
+                var row = btn.closest('.ul-like-row');
+                row.querySelectorAll('.ul-like-btn[data-msg]').forEach(function(b){
+                    var bl = b.dataset.isLike === 'true';
+                    var cnt = b.querySelector('.ul-like-count');
+                    if(cnt) cnt.textContent = bl ? d.likes : d.dislikes;
+                    b.classList.toggle('active', bl ? d.userReaction===true : d.userReaction===false);
+                });
+            }).catch(function(){});
+        });
+    });
+});
+</script>
+}

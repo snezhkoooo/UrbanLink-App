@@ -1,0 +1,90 @@
+@model IEnumerable<Trip>
+@{
+    ViewData["Title"] = "Trips";
+    var search = ViewBag.Search as string ?? "";
+}
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Next 14 days</div>
+        <h2>Upcoming trips</h2>
+    </div>
+    <a class="ul-btn ul-btn-primary" asp-action="Create">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Create trip
+    </a>
+</div>
+
+<form method="get" asp-action="Index" class="ul-enter" style="margin-bottom:1.25rem;display:flex;gap:0.5rem;">
+    <input type="text" name="q" value="@search" class="ul-input" placeholder="🔍 Search by title, city, driver…" style="flex:1;" />
+    <button type="submit" class="ul-btn ul-btn-primary">Search</button>
+    @if (!string.IsNullOrEmpty(search))
+    {
+        <a class="ul-btn ul-btn-secondary" asp-action="Index">Clear</a>
+    }
+</form>
+
+@if (Model.Any())
+{
+    <div class="ul-table-wrap ul-enter">
+        <table class="ul-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Driver</th>
+                    <th>Route</th>
+                    <th>Date</th>
+                    <th>Seats</th>
+                    <th>Per seat</th>
+                    <th>Event</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var trip in Model)
+            {
+                <tr class="ul-row-clickable" data-href="@Url.Action("Details","Trips",new{id=trip.Id})">
+                    <td class="ul-cell-strong">@trip.Title</td>
+                    <td>
+                        @if (trip.Driver != null)
+                        {
+                            <span style="font-size: 0.88rem;">@trip.Driver.FullName</span>
+                        }
+                        else
+                        {
+                            <span style="color: var(--text-lo); font-size:0.78rem;">—</span>
+                        }
+                    </td>
+                    <td class="ul-cell-route">@trip.FromLocation <span class="arrow">→</span> @trip.ToLocation</td>
+                    <td>@trip.TravelDate.ToString("ddd, MMM d · HH:mm")</td>
+                    <td><span class="ul-pill ul-pill-cyan">@trip.AvailableSeats</span></td>
+                    <td><span class="ul-pill ul-pill-amber">€ @trip.Price.ToString("0.##")</span></td>
+                    <td>
+                        @if (trip.Event != null)
+                        {
+                            <a class="ul-trip-card-link" asp-controller="Events" asp-action="Details" asp-route-id="@trip.Event.Id" style="font-size: 0.85rem;" data-stop-row>@trip.Event.Title</a>
+                        }
+                        else
+                        {
+                            <span style="color: var(--text-lo); font-family: var(--font-mono); font-size: 0.78rem;">—</span>
+                        }
+                    </td>
+                    <td style="text-align:right;">
+                        <span class="ul-trip-card-link">
+                            Details
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+                        </span>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="ul-empty ul-enter">
+        <div class="ul-empty-icon">🚗</div>
+        <p>No trips in the next two weeks. Hit <strong>Create trip</strong> to put one on the map.</p>
+    </div>
+}

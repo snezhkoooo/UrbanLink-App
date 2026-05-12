@@ -1,0 +1,117 @@
+@{
+    ViewData["Title"] = "Driver verification";
+    var existing       = ViewBag.Existing as UrbanLinkStarter.Models.DriverVerificationRequest;
+    var isDriver       = (bool)(ViewBag.IsDriver ?? false);
+    var isAgeVerified  = (bool)(ViewBag.IsAgeVerified ?? false);
+}
+
+<a class="ul-trip-card-link ul-enter" asp-controller="Profile" asp-action="Index" style="margin-bottom:1rem;display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Back to profile
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div><div class="ul-section-sub">/ Trust &amp; safety</div><h2>🚗 Driver verification</h2></div>
+</div>
+<p style="color:var(--text-mid);max-width:680px;margin-bottom:1.25rem;">Required to <strong>create trips</strong>. Submit photos of your car (exterior + interior) and a clear photo of your driver's license. Approved drivers earn a <strong>blue tick</strong> next to their name.</p>
+
+@if (TempData["Success"] != null)
+{
+    <div class="ul-card ul-enter" style="border-color:rgba(78,224,176,0.4);background:rgba(78,224,176,0.05);margin-bottom:1rem;"><p style="margin:0;color:var(--accent-mint);">@TempData["Success"]</p></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="ul-auth-error ul-enter" style="margin-bottom:1rem;">@TempData["Error"]</div>
+}
+
+@if (isDriver)
+{
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#58c8ff,#3b82f6);display:flex;align-items:center;justify-content:center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h3 style="margin:0 0 0.4rem;">You're a verified driver</h3>
+        <p style="color:var(--text-mid);margin:0;">You can post trips and your profile shows the blue tick.</p>
+    </div>
+}
+else if (!isAgeVerified)
+{
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:var(--grad-amber);display:flex;align-items:center;justify-content:center;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--bg-deep)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 style="margin:0 0 0.4rem;">Verify your age first</h3>
+        <p style="color:var(--text-mid);margin:0 0 1.25rem;max-width:520px;margin-left:auto;margin-right:auto;">Before becoming a driver you need to confirm you are 18+. Please complete age verification — it only takes a minute.</p>
+        <a class="ul-btn ul-btn-primary" asp-controller="Verification" asp-action="Index">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            Verify my age
+        </a>
+    </div>
+}
+else if (existing != null && existing.Status == UrbanLinkStarter.Models.VerificationStatus.Pending)
+{
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:var(--grad-amber);display:flex;align-items:center;justify-content:center;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--bg-deep)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3 style="margin:0 0 0.4rem;">Pending review</h3>
+        <p style="color:var(--text-mid);margin:0;">An admin will review your documents shortly.</p>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="Submit" enctype="multipart/form-data" class="ul-form-card" id="driverVerifForm">
+        @Html.AntiForgeryToken()
+
+        <div class="ul-form-row">
+            <label>Car exterior photo</label>
+            <input type="file" name="carPhoto" accept="image/*" class="ul-input" required style="padding:0.7rem 1rem;" />
+        </div>
+        <div class="ul-form-row" style="margin-top:0.85rem;">
+            <label>Car interior photo</label>
+            <input type="file" name="carInteriorPhoto" accept="image/*" class="ul-input" required style="padding:0.7rem 1rem;" />
+        </div>
+        <div class="ul-form-row" style="margin-top:0.85rem;">
+            <label>Driver's license photo</label>
+            <input type="file" name="licensePhoto" accept="image/*" class="ul-input" required style="padding:0.7rem 1rem;" />
+        </div>
+
+        @if (existing != null && existing.Status == UrbanLinkStarter.Models.VerificationStatus.Rejected)
+        {
+            <div class="ul-auth-error" style="margin-top:1rem;">
+                Your previous submission was rejected.
+                @if (!string.IsNullOrWhiteSpace(existing.AdminNote)) { <span>Reason: @existing.AdminNote</span> }
+            </div>
+        }
+
+        <div class="ul-card" style="margin-top:1.25rem;background:rgba(255,181,71,0.05);border-color:rgba(255,181,71,0.3);">
+            <h4 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--accent-amber);">🔒 Data protection (GDPR)</h4>
+            <p style="font-size:0.88rem;color:var(--text-mid);margin:0 0 0.85rem;line-height:1.55;">
+                Your photos are uploaded solely to verify that you are a legitimate driver with a valid car and license. They are stored only until an admin completes the review and <strong>permanently deleted</strong> afterwards. We do not share, sell, or retain this data. By submitting you consent to this processing under <a href="https://gdpr.eu" target="_blank" rel="noopener" style="color:var(--accent-cyan);">EU GDPR</a>.
+            </p>
+            <label class="ul-checkbox" id="gdprLabel">
+                <input type="checkbox" id="gdprCheck" name="gdprConsent" value="true" required />
+                <span>I agree to the GDPR consent and confirm the photos are of my own car and license.</span>
+            </label>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button type="submit" class="ul-btn ul-btn-success" id="submitBtn" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                Submit for review
+            </button>
+            <a class="ul-btn ul-btn-secondary" asp-controller="Profile" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+
+    @section Scripts {
+    <script>
+    document.addEventListener('DOMContentLoaded', function(){
+        var check  = document.getElementById('gdprCheck');
+        var submit = document.getElementById('submitBtn');
+        if (!check || !submit) return;
+        check.addEventListener('change', function(){ submit.disabled = !check.checked; });
+    });
+    </script>
+    }
+}

@@ -1,0 +1,148 @@
+@model Trip
+@{
+    ViewData["Title"] = "Edit trip";
+    var events = ViewBag.UpcomingEvents as List<Event> ?? new();
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Trips" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Manage trips
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Control room · Edit trip</div>
+        <h2>Edit trip</h2>
+    </div>
+</div>
+
+<form method="post" asp-route-id="@Model.Id" class="ul-form-card">
+    @Html.AntiForgeryToken()
+    <input asp-for="Id" type="hidden" />
+    <input asp-for="DriverId" type="hidden" />
+
+    <div class="ul-form-row">
+        <label asp-for="Title">Title</label>
+        <input asp-for="Title" class="ul-input" />
+    </div>
+
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="FromLocation">From</label>
+            <input asp-for="FromLocation" class="ul-input" data-place-suggest />
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="ToLocation">To</label>
+            <input asp-for="ToLocation" class="ul-input" data-place-suggest />
+        </div>
+    </div>
+
+    <div class="ul-form-row" style="margin-top:1.2rem;">
+        <label>Date &amp; time</label>
+        <div class="ul-wheel-row">
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Date</div>
+                <div data-date-wheel data-target="editHidDate" data-value="@Model.TravelDate.ToString("yyyy-MM-dd")" data-combine-with="editTravelDate" data-time-input="editHidTime"></div>
+            </div>
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Time (24h)</div>
+                <div data-time-wheel data-target="editHidTime" data-value="@Model.TravelDate.ToString("HH:mm")" data-combine-with="editTravelDate" data-date-input="editHidDate"></div>
+            </div>
+        </div>
+        <input type="hidden" id="editHidDate" value="@Model.TravelDate.ToString("yyyy-MM-dd")" />
+        <input type="hidden" id="editHidTime" value="@Model.TravelDate.ToString("HH:mm")" />
+        <input asp-for="TravelDate" type="hidden" id="editTravelDate" value="@Model.TravelDate.ToString("yyyy-MM-ddTHH:mm")" />
+    </div>
+
+    <div class="ul-section-sub" style="margin-top:1.5rem;">/ Car</div>
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="CarModel">Car model</label>
+            <input asp-for="CarModel" class="ul-input" />
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="CarYear">Year</label>
+            <div data-year-wheel data-target="CarYearEdit" data-value="@Model.CarYear" data-min="1980" data-max="@DateTime.Now.Year"></div>
+            <input asp-for="CarYear" type="hidden" id="CarYearEdit" value="@Model.CarYear" />
+        </div>
+    </div>
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="FuelType">Fuel</label>
+            <select asp-for="FuelType" class="ul-input" style="cursor:pointer;">
+                <option value="0">Gasoline</option>
+                <option value="1">Diesel</option>
+                <option value="2">LPG</option>
+                <option value="3">Electric</option>
+            </select>
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="FuelConsumption">Consumption (per 100km)</label>
+            <input asp-for="FuelConsumption" type="number" step="0.1" class="ul-input" />
+        </div>
+    </div>
+
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="AvailableSeats">Available seats</label>
+            <div class="ul-seats" id="editSeatsPicker">
+                @for (int i = 1; i <= 6; i++)
+                {
+                    <button type="button" class="ul-seat-btn @(Model.AvailableSeats == i ? "active" : "")" data-seats="@i">@i</button>
+                }
+            </div>
+            <input asp-for="AvailableSeats" type="hidden" id="editSeatsInput" value="@Model.AvailableSeats" />
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="Price">Per seat (€, computed)</label>
+            <input asp-for="Price" type="number" step="0.01" class="ul-input" />
+        </div>
+    </div>
+
+    <div class="ul-form-row" style="margin-top: 1.2rem;">
+        <label asp-for="EventId">Linked event</label>
+        <select asp-for="EventId" class="ul-input" style="cursor:pointer;">
+            <option value="">— No event —</option>
+            @foreach (var ev in events)
+            {
+                <option value="@ev.Id" selected="@(Model.EventId == ev.Id)">@ev.Title (@ev.EventDate.ToString("MMM d"))</option>
+            }
+        </select>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; margin-top:1.75rem;">
+        <button type="submit" class="ul-btn ul-btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Save changes
+        </button>
+        <a class="ul-btn ul-btn-secondary" asp-action="Trips">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var hidDate = document.getElementById('editHidDate');
+    var hidTime = document.getElementById('editHidTime');
+    var hidComb = document.getElementById('editTravelDate');
+    if (hidDate) {
+        function sync() { if (hidDate.value && hidTime.value) hidComb.value = hidDate.value + 'T' + hidTime.value; }
+        hidDate.addEventListener('change', sync);
+        hidTime.addEventListener('change', sync);
+    }
+
+    var picker  = document.getElementById('editSeatsPicker');
+    var seatsIn = document.getElementById('editSeatsInput');
+    if (picker) {
+        picker.addEventListener('click', function (e) {
+            var btn = e.target.closest('.ul-seat-btn');
+            if (!btn) return;
+            e.preventDefault();
+            seatsIn.value = btn.dataset.seats;
+            picker.querySelectorAll('.ul-seat-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+        });
+    }
+});
+</script>
+}

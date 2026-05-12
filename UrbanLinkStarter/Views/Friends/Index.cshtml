@@ -1,0 +1,160 @@
+@model IEnumerable<UrbanLinkStarter.Models.ApplicationUser>
+@{
+    ViewData["Title"] = "My friends";
+    var incoming = (ViewBag.Incoming as List<UrbanLinkStarter.Models.Friendship>) ?? new();
+    var outgoing = (ViewBag.Outgoing as List<UrbanLinkStarter.Models.Friendship>) ?? new();
+
+    string Initials(string? full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "U";
+        var parts = full.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..1].ToUpper();
+        return (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpper();
+    }
+    string Variant(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        var classes = new[] { "", "ul-avatar-violet", "ul-avatar-mint", "ul-avatar-sunset" };
+        return classes[Math.Abs(key.GetHashCode()) % classes.Length];
+    }
+}
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Social</div>
+        <h2>My Friends</h2>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="ul-card ul-enter" style="border-color: rgba(78,224,176,0.4); background: rgba(78,224,176,0.05); margin-bottom:1rem;">
+        <p style="margin:0; color: var(--accent-mint);">@TempData["Success"]</p>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="ul-card ul-enter" style="border-color: rgba(255,61,138,0.4); background: rgba(255,61,138,0.05); margin-bottom:1rem;">
+        <p style="margin:0; color: var(--accent-orange);">@TempData["Error"]</p>
+    </div>
+}
+
+@if (incoming.Any())
+{
+    <div class="ul-section-head ul-enter" style="margin-top:1.5rem;">
+        <div>
+            <div class="ul-section-sub">/ Pending</div>
+            <h3>Friend requests (@incoming.Count)</h3>
+        </div>
+    </div>
+    <div class="ul-grid ul-grid-2 ul-stagger" style="gap:1rem;">
+        @foreach (var fr in incoming)
+        {
+            var u = fr.Requester!;
+            <div class="ul-card" style="display:flex;align-items:center;gap:1rem;">
+                <a class="ul-avatar @Variant(u.Id)" asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="width:56px;height:56px;font-size:1.1rem;overflow:hidden;padding:0;text-decoration:none;flex-shrink:0;">
+                    @if (!string.IsNullOrEmpty(u.ProfilePicture))
+                    {
+                        <img src="@u.ProfilePicture" alt="@u.FullName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    }
+                    else
+                    {
+                        @Initials(u.FullName)
+                    }
+                </a>
+                <div style="flex:1;min-width:0;">
+                    <a asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="text-decoration:none;color:var(--text-hi);font-weight:600;">@u.FullName</a>
+                    <div style="font-size:0.82rem;color:var(--text-lo);">wants to be your friend</div>
+                </div>
+                <div style="display:flex;gap:0.4rem;">
+                    <form method="post" asp-action="Accept" style="margin:0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@fr.Id" />
+                        <button class="ul-btn ul-btn-success ul-btn-sm" type="submit">Accept</button>
+                    </form>
+                    <form method="post" asp-action="Reject" style="margin:0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@fr.Id" />
+                        <button class="ul-btn ul-btn-secondary ul-btn-sm" type="submit">Reject</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<div class="ul-section-head ul-enter" style="margin-top:2rem;">
+    <div>
+        <div class="ul-section-sub">/ Your circle</div>
+        <h3>Friends (@Model.Count())</h3>
+    </div>
+</div>
+
+@if (Model.Any())
+{
+    <div class="ul-grid ul-grid-3 ul-stagger" style="gap:1rem;">
+        @foreach (var u in Model)
+        {
+            <div class="ul-card" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:1.25rem;">
+                <a class="ul-avatar @Variant(u.Id)" asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="width:72px;height:72px;font-size:1.3rem;overflow:hidden;padding:0;text-decoration:none;">
+                    @if (!string.IsNullOrEmpty(u.ProfilePicture))
+                    {
+                        <img src="@u.ProfilePicture" alt="@u.FullName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    }
+                    else
+                    {
+                        @Initials(u.FullName)
+                    }
+                </a>
+                <a asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="text-decoration:none;color:var(--text-hi);font-weight:600;margin-top:0.65rem;">@u.FullName</a>
+                <div style="font-size:0.82rem;color:var(--text-mid);">Age @u.Age</div>
+                <div style="display:flex;gap:0.4rem;margin-top:0.85rem;">
+                    <a class="ul-btn ul-btn-secondary ul-btn-sm" asp-controller="Messages" asp-action="Thread" asp-route-id="@u.Id">Message</a>
+                    <form method="post" asp-action="Remove" onsubmit="return confirm('Remove this friend?');" style="margin:0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@u.Id" />
+                        <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color:var(--accent-orange);">Remove</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <p style="color:var(--text-mid);margin:0;">No friends yet. Visit a user's profile and click <strong>Add friend</strong>.</p>
+    </div>
+}
+
+@if (outgoing.Any())
+{
+    <div class="ul-section-head ul-enter" style="margin-top:2rem;">
+        <div>
+            <div class="ul-section-sub">/ Sent</div>
+            <h3>Awaiting reply (@outgoing.Count)</h3>
+        </div>
+    </div>
+    <div class="ul-grid ul-grid-2 ul-stagger" style="gap:1rem;">
+        @foreach (var fr in outgoing)
+        {
+            var u = fr.Addressee!;
+            <div class="ul-card" style="display:flex;align-items:center;gap:1rem;">
+                <a class="ul-avatar @Variant(u.Id)" asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="width:48px;height:48px;font-size:1rem;overflow:hidden;padding:0;text-decoration:none;flex-shrink:0;">
+                    @if (!string.IsNullOrEmpty(u.ProfilePicture))
+                    {
+                        <img src="@u.ProfilePicture" alt="@u.FullName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    }
+                    else
+                    {
+                        @Initials(u.FullName)
+                    }
+                </a>
+                <div style="flex:1;min-width:0;">
+                    <a asp-controller="Profile" asp-action="View" asp-route-id="@u.Id" style="text-decoration:none;color:var(--text-hi);font-weight:600;">@u.FullName</a>
+                    <div style="font-size:0.82rem;color:var(--text-lo);">awaiting response…</div>
+                </div>
+            </div>
+        }
+    </div>
+}

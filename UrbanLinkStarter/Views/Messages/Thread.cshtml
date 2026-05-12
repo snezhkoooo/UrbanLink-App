@@ -1,0 +1,79 @@
+@model IEnumerable<UrbanLinkStarter.Models.DirectMessage>
+@{
+    var other = ViewBag.Other as UrbanLinkStarter.Models.ApplicationUser;
+    var me    = ViewBag.Me    as UrbanLinkStarter.Models.ApplicationUser;
+    ViewData["Title"] = $"Chat with {other?.FullName}";
+
+    string Initials(string? full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "U";
+        var parts = full.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..1].ToUpper();
+        return (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpper();
+    }
+    string Variant(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        var classes = new[] { "", "ul-avatar-violet", "ul-avatar-mint", "ul-avatar-sunset" };
+        return classes[Math.Abs(key.GetHashCode()) % classes.Length];
+    }
+}
+
+<a class="ul-back ul-enter" asp-action="Index" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--text-mid);text-decoration:none;margin-bottom:1rem;font-size:0.9rem;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to inbox
+</a>
+
+<div class="ul-card ul-enter" style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+    <a class="ul-avatar @Variant(other?.Id)" asp-controller="Profile" asp-action="View" asp-route-id="@other?.Id" style="width:56px;height:56px;font-size:1.1rem;overflow:hidden;padding:0;text-decoration:none;flex-shrink:0;">
+        @if (!string.IsNullOrEmpty(other?.ProfilePicture))
+        {
+            <img src="@other.ProfilePicture" alt="@other.FullName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+        }
+        else
+        {
+            @Initials(other?.FullName)
+        }
+    </a>
+    <div>
+        <a asp-controller="Profile" asp-action="View" asp-route-id="@other?.Id" style="text-decoration:none;color:var(--text-hi);font-weight:600;font-size:1.1rem;">@other?.FullName</a>
+        <div style="font-size:0.85rem;color:var(--text-mid);">Age @other?.Age</div>
+    </div>
+</div>
+
+<div id="dmThread" class="ul-card" style="display:flex;flex-direction:column;gap:0.6rem;padding:1rem;min-height:300px;max-height:60vh;overflow-y:auto;">
+    @if (Model.Any())
+    {
+        foreach (var m in Model)
+        {
+            var mine = m.FromUserId == me!.Id;
+            <div style="display:flex;justify-content:@(mine ? "flex-end" : "flex-start");">
+                <div style="max-width:75%;padding:0.6rem 0.9rem;border-radius:14px;background:@(mine ? "var(--grad-mint)" : "var(--surface-strong)");color:@(mine ? "var(--bg-deep)" : "var(--text-hi)");">
+                    <div style="font-size:0.95rem;white-space:pre-wrap;word-wrap:break-word;">@m.Body</div>
+                    <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;text-align:right;">@m.SentOn.ToLocalTime().ToString("HH:mm")</div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p style="text-align:center;color:var(--text-lo);">Say hi 👋</p>
+    }
+</div>
+
+<form method="post" asp-action="Send" style="margin-top:1rem;display:flex;gap:0.5rem;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="toUserId" value="@other?.Id" />
+    <input type="text" name="body" class="ul-input" placeholder="Write a message…" required maxlength="1000" autocomplete="off" autofocus style="flex:1;" />
+    <button type="submit" class="ul-btn ul-btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        Send
+    </button>
+</form>
+
+<script>
+    (function(){
+        var t = document.getElementById('dmThread');
+        if (t) t.scrollTop = t.scrollHeight;
+    })();
+</script>

@@ -1,0 +1,47 @@
+@model IEnumerable<Message>
+@{
+    ViewData["Title"] = "My messages";
+    string Initials(string? n){ if(string.IsNullOrWhiteSpace(n))return "U"; var p=n.Trim().Split(' ',StringSplitOptions.RemoveEmptyEntries); return p.Length==1?p[0][0].ToString().ToUpper():(p[0][0].ToString()+p[^1][0].ToString()).ToUpper(); }
+    string AV(string? k){ if(string.IsNullOrWhiteSpace(k))return ""; var c=new[]{"","ul-avatar-violet","ul-avatar-mint","ul-avatar-sunset"}; return c[Math.Abs(k.GetHashCode())%c.Length]; }
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom:1rem;display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Community chat
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div><div class="ul-section-sub">/ Your activity</div><h2>My messages</h2></div>
+    <span class="ul-pill ul-pill-cyan">@Model.Count() posts</span>
+</div>
+
+@if (Model.Any()) {
+    <div class="ul-stagger">
+    @foreach (var m in Model) {
+        var u = m.User; var name = u?.FullName ?? "User"; var variant = AV(m.UserId ?? name);
+        <div class="ul-message">
+            <div class="ul-message-head">
+                <div class="ul-avatar @variant" style="overflow:hidden;padding:0;">
+                    @if(u!=null&&!string.IsNullOrEmpty(u.ProfilePicture)){ <img src="@u.ProfilePicture" alt="@name" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/> } else { @Initials(name) }
+                </div>
+                <div style="flex:1;">
+                    <span class="ul-message-author">@name</span>
+                    <div class="ul-message-time" style="margin-left:0;">@m.CreatedOn.ToString("MMM d, yyyy · HH:mm")</div>
+                </div>
+                <form method="post" asp-action="DeleteMessage" asp-route-id="@m.Id" style="margin:0;" data-confirm-msg="Delete this message?">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="ul-row-action ul-row-action-delete" title="Delete">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                    </button>
+                </form>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(m.Content)) { <div class="ul-message-body">@m.Content</div> }
+            @if (!string.IsNullOrEmpty(m.ImageData)) {
+                <div style="margin-top:0.65rem;"><img src="@m.ImageData" style="max-width:100%;max-height:200px;border-radius:10px;border:1px solid var(--border);object-fit:contain;cursor:pointer;" onclick="window.open(this.src)" /></div>
+            }
+        </div>
+    }
+    </div>
+} else {
+    <div class="ul-empty ul-enter"><div class="ul-empty-icon">💬</div><p>You haven't posted anything yet. Head to <a asp-action="Index" style="color:var(--accent-mint);">Community chat</a> to join in.</p></div>
+}

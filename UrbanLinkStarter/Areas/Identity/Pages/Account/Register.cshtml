@@ -1,0 +1,134 @@
+@page
+@model RegisterModel
+@{
+    ViewData["Title"] = "Create account";
+    var providers = Model.ExternalLogins.Select(s => s.Name.ToLower()).ToHashSet();
+    var allProviders = new[]
+    {
+        new { Key = "Google",    Class = "ul-oauth-google" },
+        new { Key = "Apple",     Class = "ul-oauth-apple" },
+        new { Key = "Facebook",  Class = "ul-oauth-facebook" },
+        new { Key = "Instagram", Class = "ul-oauth-instagram" },
+        new { Key = "Twitter",   Class = "ul-oauth-x" }
+    };
+}
+
+<div class="ul-auth-wrap">
+    <div class="ul-auth-card ul-enter">
+        <div class="ul-section-sub">/ Get on board</div>
+        <h2 style="margin-top: 0.4rem;">Create account</h2>
+        <p style="margin-top: 0.4rem; margin-bottom: 1.5rem; color: var(--text-mid);">Join the city — share rides, find events, meet people going your way.</p>
+
+        <div class="ul-oauth-row">
+            @foreach (var p in allProviders)
+            {
+                var isConfigured = providers.Contains(p.Key.ToLower());
+                if (isConfigured)
+                {
+                    <form method="post" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" style="margin:0;">
+                        <button type="submit" name="provider" value="@p.Key" class="ul-oauth-btn @p.Class">
+                            @await Html.PartialAsync("_OAuthIcon", p.Key)
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="ul-oauth-btn @p.Class ul-oauth-disabled" onclick="alert('@p.Key sign-up is not configured yet.\nAdd keys in appsettings.json under Authentication.@p.Key and restart.');">
+                        @await Html.PartialAsync("_OAuthIcon", p.Key)
+                    </button>
+                }
+            }
+        </div>
+
+        <div class="ul-divider"><span>or with email</span></div>
+
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="ul-auth-error"></div>
+
+            <div class="ul-form-row">
+                <label asp-for="Input.FullName">Full name</label>
+                <input asp-for="Input.FullName" class="ul-input" placeholder="Jane Doe" autocomplete="name" />
+                <span asp-validation-for="Input.FullName" class="ul-field-error"></span>
+            </div>
+
+            <div class="ul-form-grid">
+                <div class="ul-form-row">
+                    <label asp-for="Input.Email">Email</label>
+                    <input asp-for="Input.Email" class="ul-input" placeholder="jane@example.com" autocomplete="email" />
+                    <span asp-validation-for="Input.Email" class="ul-field-error"></span>
+                </div>
+                <div class="ul-form-row">
+                    <label asp-for="Input.Age">Age</label>
+                    <input asp-for="Input.Age" type="number" min="18" max="99" class="ul-input" placeholder="25" />
+                    <span asp-validation-for="Input.Age" class="ul-field-error"></span>
+                </div>
+            </div>
+
+            <div class="ul-form-grid">
+                <div class="ul-form-row">
+                    <label asp-for="Input.Password">Password</label>
+                    <input asp-for="Input.Password" id="regPassword" class="ul-input" placeholder="••••••••" autocomplete="new-password" />
+                    <span asp-validation-for="Input.Password" class="ul-field-error"></span>
+                </div>
+                <div class="ul-form-row">
+                    <label asp-for="Input.ConfirmPassword">Confirm</label>
+                    <input asp-for="Input.ConfirmPassword" id="regConfirm" class="ul-input" placeholder="••••••••" autocomplete="new-password" />
+                    <span asp-validation-for="Input.ConfirmPassword" class="ul-field-error"></span>
+                </div>
+            </div>
+
+            <div id="pwReqs" class="ul-pw-reqs" aria-live="polite">
+                <div class="ul-pw-reqs-title">Password must contain:</div>
+                <ul>
+                    <li data-rule="len"><span class="ul-pw-dot"></span> At least 8 characters</li>
+                    <li data-rule="lower"><span class="ul-pw-dot"></span> One lowercase letter (a–z)</li>
+                    <li data-rule="upper"><span class="ul-pw-dot"></span> One uppercase letter (A–Z)</li>
+                    <li data-rule="digit"><span class="ul-pw-dot"></span> One digit (0–9)</li>
+                    <li data-rule="special"><span class="ul-pw-dot"></span> One special character (!@@#$…)</li>
+                    <li data-rule="match"><span class="ul-pw-dot"></span> Passwords match</li>
+                </ul>
+            </div>
+
+            <button type="submit" class="ul-btn ul-btn-success" style="width: 100%; justify-content: center; margin-top: 1.5rem;">
+                Create account
+                <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
+
+            <p class="ul-auth-foot">
+                Already have one? <a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">Sign in</a>
+            </p>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var pw      = document.getElementById('regPassword');
+    var confirm = document.getElementById('regConfirm');
+    var box     = document.getElementById('pwReqs');
+    if (!pw || !box) return;
+
+    var rules = {
+        len:     function (v) { return v.length >= 8; },
+        lower:   function (v) { return /[a-z]/.test(v); },
+        upper:   function (v) { return /[A-Z]/.test(v); },
+        digit:   function (v) { return /[0-9]/.test(v); },
+        special: function (v) { return /[^A-Za-z0-9]/.test(v); },
+        match:   function (v) { return v.length > 0 && v === (confirm ? confirm.value : ''); }
+    };
+
+    function check() {
+        var v = pw.value;
+        Object.keys(rules).forEach(function (key) {
+            var li = box.querySelector('li[data-rule="' + key + '"]');
+            if (li) li.classList.toggle('ok', rules[key](v));
+        });
+    }
+
+    pw.addEventListener('input', check);
+    if (confirm) confirm.addEventListener('input', check);
+    check();
+})();
+</script>
+}

@@ -1,0 +1,76 @@
+@model IEnumerable<Reservation>
+@{
+    ViewData["Title"] = "My reservations";
+
+    string PayLabel(PaymentMethod m) => m switch
+    {
+        PaymentMethod.Cash => "💵 Cash",
+        PaymentMethod.Revolut => "📱 Revolut",
+        PaymentMethod.BankTransfer => "🏦 Bank transfer",
+        _ => m.ToString()
+    };
+}
+
+<a class="ul-back ul-enter" asp-controller="Home" asp-action="Index" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--text-mid);text-decoration:none;margin-bottom:1rem;font-size:0.9rem;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Your trips</div>
+        <h2>My reservations</h2>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="ul-card ul-enter" style="border-color: rgba(78,224,176,0.4); background: rgba(78,224,176,0.05); margin-bottom:1rem;">
+        <p style="margin:0; color: var(--accent-mint);">@TempData["Success"]</p>
+    </div>
+}
+
+@if (Model.Any())
+{
+    <div class="ul-grid ul-stagger" style="gap: 1rem;">
+    @foreach (var r in Model)
+    {
+        var trip = r.Trip!;
+        <article class="ul-card ul-trip-card">
+            <div class="ul-trip-card-head">
+                <h3 class="ul-trip-card-title">@trip.Title</h3>
+                <span class="ul-trip-card-price">€ @trip.Price.ToString("0.##")</span>
+            </div>
+            <div class="ul-route">
+                <div class="ul-route-stop">
+                    <div class="ul-route-stop-label">From</div>
+                    <div class="ul-route-stop-name">@trip.FromLocation</div>
+                </div>
+                <div class="ul-route-line"></div>
+                <div class="ul-route-stop" style="text-align:right;">
+                    <div class="ul-route-stop-label">To</div>
+                    <div class="ul-route-stop-name">@trip.ToLocation</div>
+                </div>
+            </div>
+            <div class="ul-trip-meta">
+                <span class="ul-trip-meta-item">📅 @trip.TravelDate.ToString("ddd, MMM d · HH:mm")</span>
+                <span class="ul-trip-meta-item">@PayLabel(r.PaymentMethod)</span>
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-top: 0.5rem;">
+                <a class="ul-btn ul-btn-secondary ul-btn-sm" asp-controller="Trips" asp-action="Details" asp-route-id="@trip.Id">View trip</a>
+                <form method="post" asp-action="Cancel" asp-route-id="@r.Id" style="margin:0;" data-confirm-msg="Cancel this reservation?">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="color: var(--accent-magenta);">Cancel</button>
+                </form>
+            </div>
+        </article>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty ul-enter">
+        <div class="ul-empty-icon">🎟️</div>
+        <p>No reservations yet. Browse <a asp-controller="Trips" asp-action="Index" style="color: var(--accent-mint);">upcoming trips</a> to book a seat.</p>
+    </div>
+}

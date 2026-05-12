@@ -1,0 +1,76 @@
+@{
+    ViewData["Title"] = "Contacts";
+}
+
+<section class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Get in touch</div>
+        <h2>Contacts</h2>
+    </div>
+</section>
+
+@if (TempData["Success"] != null)
+{
+    <div class="ul-card ul-enter" style="border-color: rgba(78,224,176,0.4); background: rgba(78,224,176,0.05); margin-bottom:1rem;">
+        <p style="margin:0; color: var(--accent-mint);">@TempData["Success"]</p>
+    </div>
+}
+
+<div class="ul-grid ul-grid-2 ul-stagger" style="gap:1.25rem;">
+    <div class="ul-card">
+        <h3 style="margin-bottom:0.75rem;">Reach us directly</h3>
+        <p style="color:var(--text-mid);margin-bottom:1rem;">
+            For any questions, partnership ideas, or technical issues, drop us a line at:
+        </p>
+        <p style="margin-bottom:1.2rem;">
+            <a href="mailto:nikolay.dyulgerov.highschool@buditel.bg" style="color:var(--accent-cyan);text-decoration:none;font-family:var(--font-mono);">
+                ✉ nikolay.dyulgerov.highschool@@buditel.bg
+            </a>
+        </p>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <a href="https://facebook.com/" target="_blank" rel="noopener" class="ul-btn ul-btn-secondary ul-btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                Facebook
+            </a>
+            <a href="https://instagram.com/" target="_blank" rel="noopener" class="ul-btn ul-btn-secondary ul-btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                Instagram
+            </a>
+        </div>
+    </div>
+
+    <div class="ul-card">
+        <h3 style="margin-bottom:0.75rem;">Send us a Message</h3>
+        <form method="post" asp-action="SendContact" asp-controller="Home">
+            @Html.AntiForgeryToken()
+            <div class="ul-form-row">
+                <label for="contactName">👤 Your name</label>
+                <input id="contactName" name="name" class="ul-input" placeholder="Your name" required maxlength="100" />
+            </div>
+            <div class="ul-form-row" style="margin-top:0.75rem;">
+                <label for="contactEmail">✉ Email address</label>
+                <input id="contactEmail" name="email" type="email" class="ul-input" placeholder="you@example.com" required maxlength="200" />
+            </div>
+            <div class="ul-form-row" style="margin-top:0.75rem;">
+                <label for="contactSubject">🏷 Subject</label>
+                <select id="contactSubject" name="subject" class="ul-input">
+                    <option value="General">General question</option>
+                    <option value="Bug">Bug report</option>
+                    <option value="Partnership">Partnership</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="ul-form-row" style="margin-top:0.75rem;">
+                <label for="contactMessage">💬 Your message</label>
+                <textarea id="contactMessage" name="message" class="ul-input ul-textarea" rows="5" required maxlength="2000" placeholder="Your message"></textarea>
+            </div>
+            <button type="submit" class="ul-btn ul-btn-primary" style="margin-top:1rem;width:100%;justify-content:center;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+                Send Message
+            </button>
+            <p style="margin-top:0.75rem;text-align:center;color:var(--text-lo);font-size:0.82rem;">
+                The message is sent directly through the platform.
+            </p>
+        </form>
+    </div>
+</div>

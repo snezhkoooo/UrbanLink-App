@@ -1,0 +1,614 @@
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using UrbanLinkStarter.Data
+@using UrbanLinkStarter.Models
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ApplicationDbContext Db
+@{
+    var cc = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var cp = (ViewContext.RouteData.Values["page"]?.ToString() ?? "").ToLower();
+    string Active(string c) => string.Equals(cc, c, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    string ActivePage(string s) => cp.Contains(s) ? "active" : "";
+
+    var isSignedIn = SignInManager.IsSignedIn(User);
+    string? userName = null;
+    string? profilePic = null;
+    string initials = "U";
+    string? currentUserId = null;
+    int unreadDms = 0;
+    int unseenFriendRequests = 0;
+    int adminPending = 0;
+    int adminPendingDriver = 0;
+    Friendship? popupFriendRequest = null;
+
+    if (isSignedIn)
+    {
+        var u = await UserManager.GetUserAsync(User);
+        userName   = u?.FullName;
+        profilePic = u?.ProfilePicture;
+        currentUserId = u?.Id;
+        if (string.IsNullOrWhiteSpace(userName)) userName = u?.Email;
+        if (!string.IsNullOrWhiteSpace(userName))
+        {
+            var pp = userName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            initials = pp.Length == 1 ? pp[0][0].ToString().ToUpper() : (pp[0][0].ToString() + pp[^1][0].ToString()).ToUpper();
+        }
+
+        if (currentUserId != null)
+        {
+            unreadDms = await Db.DirectMessages.CountAsync(d => d.ToUserId == currentUserId && d.ReadOn == null);
+            unseenFriendRequests = await Db.Friendships.CountAsync(f =>
+                f.AddresseeId == currentUserId && f.Status == FriendshipStatus.Pending && !f.SeenByAddressee);
+
+            popupFriendRequest = await Db.Friendships
+                .Include(f => f.Requester)
+                .Where(f => f.AddresseeId == currentUserId
+                    && f.Status == FriendshipStatus.Pending
+                    && !f.SeenByAddressee)
+                .OrderBy(f => f.CreatedOn)
+                .FirstOrDefaultAsync();
+
+            if (User.IsInRole("Admin"))
+            {
+                adminPending = await Db.VerificationRequests.CountAsync(v => v.Status == VerificationStatus.Pending);
+                adminPendingDriver = await Db.DriverVerificationRequests.CountAsync(v => v.Status == VerificationStatus.Pending);
+            }
+        }
+    }
+    var adminBadge = adminPending + adminPendingDriver;
+
+    // ---- Live notifications: pulled from DB since the user's last "lastSeenNotif" cookie ----
+    // Cookie value is ISO-8601 UTC. JS bumps it on every page load after toasts render.
+    DateTime sinceUtc = DateTime.UtcNow.AddDays(-7);
+    var seenCookie = Context.Request.Cookies["ul_lastSeenNotif"];
+    if (!string.IsNullOrEmpty(seenCookie) && DateTime.TryParse(seenCookie, null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsed))
+        sinceUtc = parsed;
+
+    var liveNotifs = new List<(string kind, string title, string body, string? href, string? avatar, string? initials)>();
+
+    if (isSignedIn && currentUserId != null)
+    {
+        // New DMs to me (excluding messages I already saw before)
+        var newDms = await Db.DirectMessages
+            .Include(d => d.FromUser)
+            .Where(d => d.ToUserId == currentUserId && d.SentOn > sinceUtc && d.ReadOn == null)
+            .OrderByDescending(d => d.SentOn)
+            .Take(5)
+            .ToListAsync();
+        foreach (var dm in newDms)
+        {
+            var fromName = dm.FromUser?.FullName ?? dm.FromUser?.Email ?? "Someone";
+            var preview  = dm.Body.Length > 60 ? dm.Body.Substring(0, 60) + "…" : dm.Body;
+            var inits    = string.IsNullOrWhiteSpace(fromName) ? "U" : fromName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0][0].ToString().ToUpper();
+            liveNotifs.Add(("dm", $"{fromName} sent you a message", preview, Url.Action("Thread", "Messages", new { id = dm.FromUserId }), dm.FromUser?.ProfilePicture, inits));
+        }
+
+        // New reservations on MY trips (if I'm a driver)
+        var newReservations = await Db.Reservations
+            .Include(r => r.User)
+            .Include(r => r.Trip)
+            .Where(r => r.Trip != null && r.Trip.DriverId == currentUserId && r.CreatedOn > sinceUtc && r.UserId != currentUserId)
+            .OrderByDescending(r => r.CreatedOn)
+            .Take(5)
+            .ToListAsync();
+        foreach (var r in newReservations)
+        {
+            var who = r.User?.FullName ?? r.User?.Email ?? "Someone";
+            liveNotifs.Add(("book", "New reservation on your trip", $"{who} booked {r.SeatsCount} seat{(r.SeatsCount > 1 ? "s" : "")} on \"{r.Trip!.Title}\".", Url.Action("Details", "Trips", new { id = r.TripId }), r.User?.ProfilePicture, who.Length > 0 ? who.Substring(0,1).ToUpper() : "U"));
+        }
+
+        // My identity verification result (since last seen)
+        var myVerif = await Db.VerificationRequests
+            .Where(v => v.UserId == currentUserId && v.ReviewedOn != null && v.ReviewedOn > sinceUtc && v.Status != VerificationStatus.Pending)
+            .OrderByDescending(v => v.ReviewedOn)
+            .FirstOrDefaultAsync();
+        if (myVerif != null)
+        {
+            if (myVerif.Status == VerificationStatus.Approved)
+                liveNotifs.Add(("ok", "Age verification approved", "You're now age-verified — the blue tick is yours.", Url.Action("Index", "Profile"), null, null));
+            else
+                liveNotifs.Add(("err", "Age verification rejected", "Your verification was not approved. Please try again.", Url.Action("Index", "Verification"), null, null));
+        }
+
+        // My driver verification result (since last seen)
+        var myDrv = await Db.DriverVerificationRequests
+            .Where(v => v.UserId == currentUserId && v.ReviewedOn != null && v.ReviewedOn > sinceUtc && v.Status != VerificationStatus.Pending)
+            .OrderByDescending(v => v.ReviewedOn)
+            .FirstOrDefaultAsync();
+        if (myDrv != null)
+        {
+            if (myDrv.Status == VerificationStatus.Approved)
+                liveNotifs.Add(("ok", "Driver verification approved", "You can now create trips — your profile shows the blue driver tick.", Url.Action("Create", "Trips"), null, null));
+            else
+                liveNotifs.Add(("err", "Driver verification rejected", "Your driver verification was not approved. Try again with clearer photos.", Url.Action("Index", "DriverVerification"), null, null));
+        }
+
+        // Admin: new submissions
+        if (User.IsInRole("Admin"))
+        {
+            var newId = await Db.VerificationRequests
+                .Include(v => v.User)
+                .Where(v => v.Status == VerificationStatus.Pending && v.CreatedOn > sinceUtc)
+                .OrderByDescending(v => v.CreatedOn)
+                .Take(3)
+                .ToListAsync();
+            foreach (var v in newId)
+            {
+                var who = v.User?.FullName ?? v.User?.Email ?? "A user";
+                liveNotifs.Add(("admin", "New age-verification submission", $"{who} submitted a document for review.", Url.Action("Verifications", "Admin"), v.User?.ProfilePicture, who.Length > 0 ? who.Substring(0,1).ToUpper() : "U"));
+            }
+
+            var newDrv = await Db.DriverVerificationRequests
+                .Include(v => v.User)
+                .Where(v => v.Status == VerificationStatus.Pending && v.CreatedOn > sinceUtc)
+                .OrderByDescending(v => v.CreatedOn)
+                .Take(3)
+                .ToListAsync();
+            foreach (var v in newDrv)
+            {
+                var who = v.User?.FullName ?? v.User?.Email ?? "A user";
+                liveNotifs.Add(("admin", "New driver submission", $"{who} submitted driver documents.", Url.Action("DriverVerifications", "Admin"), v.User?.ProfilePicture, who.Length > 0 ? who.Substring(0,1).ToUpper() : "U"));
+            }
+        }
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - UrbanLink</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="~/js/place-suggest.js" asp-append-version="true" defer></script>
+    <script src="~/js/time-wheel.js" asp-append-version="true" defer></script>
+</head>
+<body>
+    <nav class="ul-nav">
+        <div class="ul-nav-inner">
+            <a class="ul-brand" asp-controller="Home" asp-action="Index">
+                <span class="ul-brand-dot"></span>UrbanLink
+            </a>
+
+            <a class="ul-nav-icon @Active("Home")" asp-controller="Home" asp-action="Index" aria-label="Home" title="Home">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+            </a>
+
+            @if (isSignedIn)
+            {
+                <a class="ul-nav-icon @Active("Messages")" asp-controller="Messages" asp-action="Index" aria-label="Direct messages" title="Direct messages" style="position:relative;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    @if (unreadDms > 0)
+                    {
+                        <span class="ul-badge-dot">@(unreadDms > 99 ? "99+" : unreadDms.ToString())</span>
+                    }
+                </a>
+            }
+
+            <button class="ul-hamburger" id="hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="ul-nav-links" id="navLinks">
+                <a class="ul-nav-link @Active("Trips")"  asp-controller="Trips"  asp-action="Index">Find a Trip</a>
+                <a class="ul-nav-link @Active("Events")" asp-controller="Events" asp-action="Index">Events</a>
+                @if (isSignedIn)
+                {
+                    <a class="ul-nav-link @Active("Chat")" asp-controller="Chat" asp-action="Index">Chat</a>
+                }
+                @if (isSignedIn && User.IsInRole("Admin"))
+                {
+                    <a class="ul-nav-link @Active("Admin")" asp-controller="Admin" asp-action="Index" style="position:relative;">
+                        Admin
+                        @if (adminBadge > 0)
+                        {
+                            <span class="ul-badge-dot" style="top:-4px;right:-12px;">@(adminBadge > 99 ? "99+" : adminBadge.ToString())</span>
+                        }
+                    </a>
+                }
+            </div>
+
+            <div class="ul-nav-auth">
+                @if (isSignedIn)
+                {
+                    <div class="ul-user-dropdown" id="userDropdown">
+                        <button class="ul-nav-user ul-user-dropdown-toggle" type="button" style="position:relative;">
+                            <div class="ul-avatar ul-avatar-sunset" style="width:32px;height:32px;font-size:0.8rem;overflow:hidden;padding:0;">
+                                @if (!string.IsNullOrEmpty(profilePic))
+                                {
+                                    <img src="@profilePic" alt="@userName" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                }
+                                else { @initials }
+                            </div>
+                            <span class="ul-nav-user-name">@userName</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-left:2px;transition:transform 0.2s;"><path d="M6 9l6 6 6-6"/></svg>
+                            @if (unseenFriendRequests > 0)
+                            {
+                                <span class="ul-badge-dot" style="top:-4px;right:-4px;">@(unseenFriendRequests > 99 ? "99+" : unseenFriendRequests.ToString())</span>
+                            }
+                        </button>
+                        <div class="ul-dropdown-menu" role="menu">
+                            <a class="ul-dropdown-item" asp-controller="Profile" asp-action="Index">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                My Profile
+                            </a>
+                            <a class="ul-dropdown-item" asp-controller="Reservations" asp-action="MyTrips">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17h2l1.5-4.5L9 6h6l2.5 6.5L19 17h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                                My Trips
+                            </a>
+                            <a class="ul-dropdown-item" asp-controller="Reservations" asp-action="Index">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                My Reservations
+                            </a>
+                            <a class="ul-dropdown-item" asp-controller="Friends" asp-action="Index" style="position:relative;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                My Friends
+                                @if (unseenFriendRequests > 0)
+                                {
+                                    <span class="ul-badge-dot" style="position:static;margin-left:auto;">@unseenFriendRequests</span>
+                                }
+                            </a>
+                            <div class="ul-dropdown-sep"></div>
+                            <form method="post" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" style="margin:0;">
+                                <button type="submit" class="ul-dropdown-item ul-dropdown-item-danger">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                                    Sign out
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a class="ul-nav-link @ActivePage("login")" asp-area="Identity" asp-page="/Account/Login">Sign in</a>
+                    <a class="ul-btn ul-btn-primary ul-btn-sm" asp-area="Identity" asp-page="/Account/Register">Sign up</a>
+                }
+            </div>
+        </div>
+    </nav>
+
+    @* ===== Custom confirm modal ===== *@
+    <div id="ul-confirm-overlay" class="ul-confirm-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="ul-confirm-box ul-enter">
+            <p id="ul-confirm-text" class="ul-confirm-msg"></p>
+            <div class="ul-confirm-actions">
+                <button id="ul-confirm-ok"     class="ul-btn ul-btn-primary">Confirm</button>
+                <button id="ul-confirm-cancel" class="ul-btn ul-btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    @* ===== Admin pending verifications popup ===== *@
+    @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+    {
+        var adminPending = (int)(ViewBag.AdminPendingCount ?? 0);
+        if (adminPending > 0)
+        {
+            <div id="admin-pending-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+                <div class="ul-confirm-box ul-enter" style="max-width:420px;text-align:center;">
+                    <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent-amber),var(--accent-orange));display:flex;align-items:center;justify-content:center;">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3 style="margin:0 0 0.5rem;color:var(--text-hi);">@adminPending pending submission@(adminPending == 1 ? "" : "s")</h3>
+                    <p style="color:var(--text-mid);margin:0 0 1.5rem;">There @(adminPending == 1 ? "is" : "are") @adminPending identity verification request@(adminPending == 1 ? "" : "s") waiting for your review.</p>
+                    <div style="display:flex;gap:0.75rem;justify-content:center;">
+                        <a class="ul-btn ul-btn-primary" asp-controller="Admin" asp-action="Verifications" onclick="document.getElementById('admin-pending-popup').style.display='none';">Go to Submissions</a>
+                        <button class="ul-btn ul-btn-secondary" onclick="document.getElementById('admin-pending-popup').style.display='none';">Later</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ===== Driver rating popup ===== *@
+    @{
+        var pendingRatingTrip = ViewBag.PendingRatingTrip as UrbanLinkStarter.Models.Trip;
+    }
+    @if (pendingRatingTrip != null)
+    {
+        <div id="rating-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+            <div class="ul-confirm-box ul-enter" style="max-width:440px;text-align:center;">
+                <div style="margin:0 auto 1rem;font-size:2.5rem;">🚗</div>
+                <h3 style="margin:0 0 0.5rem;color:var(--text-hi);">How was your ride?</h3>
+                <p style="color:var(--text-mid);margin:0 0 1.25rem;">Rate your driver for <strong>@pendingRatingTrip.Title</strong></p>
+                <form method="post" asp-controller="Ratings" asp-action="Submit" id="ratingForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tripId" value="@pendingRatingTrip.Id" />
+                    <div class="ul-star-picker" id="starPicker">
+                        @for (int s = 1; s <= 5; s++) {
+                            <button type="button" class="ul-star-btn" data-star="@s" title="@s star@(s>1?"s":"")">★</button>
+                        }
+                    </div>
+                    <input type="hidden" name="stars" id="starsInput" value="5" />
+                    <textarea name="comment" class="ul-input ul-textarea" placeholder="Optional comment…" style="margin-top:0.85rem;min-height:70px;"></textarea>
+                    <div style="display:flex;gap:0.75rem;justify-content:center;margin-top:1.25rem;">
+                        <button type="submit" class="ul-btn ul-btn-success">Submit rating</button>
+                        <button type="button" class="ul-btn ul-btn-secondary" onclick="document.getElementById('rating-popup').style.display='none';">Skip for now</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script>
+        (function(){
+            var picker = document.getElementById('starPicker');
+            var input  = document.getElementById('starsInput');
+            var btns   = picker ? picker.querySelectorAll('.ul-star-btn') : [];
+            var current = 5;
+
+            function paint(n) {
+                btns.forEach(function(b, i) { b.classList.toggle('active', i < n); });
+            }
+            paint(current);
+
+            picker && picker.addEventListener('click', function(e){
+                var b = e.target.closest('.ul-star-btn'); if(!b) return;
+                current = parseInt(b.dataset.star, 10);
+                input.value = current;
+                paint(current);
+            });
+            picker && picker.addEventListener('mouseover', function(e){
+                var b = e.target.closest('.ul-star-btn'); if(!b) return;
+                paint(parseInt(b.dataset.star, 10));
+            });
+            picker && picker.addEventListener('mouseleave', function(){ paint(current); });
+        })();
+        </script>
+    }
+    @{
+        var verPopup = ViewBag.VerificationPopup as string;
+    }
+    @if (!string.IsNullOrEmpty(verPopup))
+    {
+        <div id="verif-popup" class="ul-confirm-overlay" style="display:flex;" role="dialog" aria-modal="true">
+            <div class="ul-confirm-box ul-enter" style="max-width:460px; text-align:center;">
+                @if (verPopup == "Approved")
+                {
+                    <div style="margin: 0 auto 1rem; width:64px; height:64px; border-radius:50%; background: linear-gradient(135deg,#58c8ff,#3b82f6); display:flex; align-items:center; justify-content:center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem; color: var(--text-hi);">You're verified! 🎉</h3>
+                    <p style="color: var(--text-mid); margin: 0 0 1.5rem;">Your identity has been confirmed. You now have the blue tick next to your name.</p>
+                    <button class="ul-btn ul-btn-success" style="width:100%; justify-content:center;" onclick="document.getElementById('verif-popup').style.display='none';">Fantastic!</button>
+                }
+                else
+                {
+                    <div style="margin: 0 auto 1rem; width:64px; height:64px; border-radius:50%; background: linear-gradient(135deg,#ff3d8a,#dc2626); display:flex; align-items:center; justify-content:center;">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem; color: var(--text-hi);">Verification not approved</h3>
+                    <p style="color: var(--text-mid); margin: 0 0 1.5rem;">Unfortunately your document couldn't be verified. You can try again with a clearer image.</p>
+                    <div style="display:flex; gap:0.75rem; justify-content:center;">
+                        <a class="ul-btn ul-btn-primary" asp-controller="Verification" asp-action="Index">Try again?</a>
+                        <button class="ul-btn ul-btn-secondary" onclick="document.getElementById('verif-popup').style.display='none';">No, Thank You</button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* ===== Friend request popup (top-right, auto-dismiss 10s) ===== *@
+    @if (popupFriendRequest?.Requester != null)
+    {
+        var rn = string.IsNullOrWhiteSpace(popupFriendRequest.Requester.FullName) ? "U" : popupFriendRequest.Requester.FullName;
+        var rp = rn.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var ri = rp.Length == 1 ? rp[0][0].ToString().ToUpper() : (rp[0][0].ToString() + rp[^1][0].ToString()).ToUpper();
+        <div id="friend-req-toast" class="ul-friend-toast ul-enter">
+            <div style="display:flex;gap:0.75rem;align-items:center;">
+                <div class="ul-avatar ul-avatar-violet" style="width:42px;height:42px;font-size:0.85rem;overflow:hidden;padding:0;flex-shrink:0;">
+                    @if (!string.IsNullOrEmpty(popupFriendRequest.Requester.ProfilePicture))
+                    {
+                        <img src="@popupFriendRequest.Requester.ProfilePicture" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    }
+                    else
+                    {
+                        @ri
+                    }
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:var(--text-hi);font-size:0.92rem;">@popupFriendRequest.Requester.FullName</div>
+                    <div style="font-size:0.82rem;color:var(--text-mid);">wants to be your friend</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.85rem;">
+                <form method="post" asp-controller="Friends" asp-action="Accept" style="flex:1;margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@popupFriendRequest.Id" />
+                    <button type="submit" class="ul-btn ul-btn-success ul-btn-sm" style="width:100%;justify-content:center;">Accept</button>
+                </form>
+                <form method="post" asp-controller="Friends" asp-action="Reject" style="flex:1;margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@popupFriendRequest.Id" />
+                    <button type="submit" class="ul-btn ul-btn-secondary ul-btn-sm" style="width:100%;justify-content:center;">Reject</button>
+                </form>
+            </div>
+        </div>
+        <script>
+            setTimeout(function () {
+                var t = document.getElementById('friend-req-toast');
+                if (t) { t.style.transition = 'opacity 0.3s, transform 0.3s'; t.style.opacity = '0'; t.style.transform = 'translateY(-10px)'; setTimeout(function(){ t.remove(); }, 350); }
+                // Also mark it as seen on the server so it doesn't show again
+                fetch('@Url.Action("MarkSeen", "Friends")?id=@popupFriendRequest.Id', { method:'POST', headers: { 'RequestVerificationToken': document.querySelector('input[name=__RequestVerificationToken]')?.value || '' } });
+            }, 10000);
+        </script>
+    }
+
+    @* ===== Live notification toast stack (DMs, bookings, admin, verification results) ===== *@
+    @if (liveNotifs.Any())
+    {
+        <div class="ul-live-toast-stack" id="ul-live-toast-stack">
+            @{ int notifIndex = 0; }
+            @foreach (var n in liveNotifs.Take(4))
+            {
+                string iconSvg = n.kind switch
+                {
+                    "dm"    => "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg>",
+                    "book"  => "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/></svg>",
+                    "admin" => "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\"/></svg>",
+                    "ok"    => "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6L9 17l-5-5\"/></svg>",
+                    "err"   => "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 6L6 18M6 6l12 12\"/></svg>",
+                    _       => ""
+                };
+                <div class="ul-live-toast" data-notif-index="@notifIndex" style="transition-delay: @(notifIndex * 80)ms;">
+                    <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+                        <div class="ul-live-toast-icon @n.kind">@Html.Raw(iconSvg)</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;color:var(--text-hi);font-size:0.9rem;line-height:1.25;">@n.title</div>
+                            <div style="font-size:0.82rem;color:var(--text-mid);margin-top:0.2rem;line-height:1.35;">@n.body</div>
+                            @if (!string.IsNullOrEmpty(n.href))
+                            {
+                                <a href="@n.href" style="display:inline-block;margin-top:0.45rem;color:var(--accent-cyan);font-size:0.8rem;text-decoration:none;font-weight:500;">Open →</a>
+                            }
+                        </div>
+                        <button type="button" class="ul-live-toast-close" aria-label="Dismiss" style="background:none;border:0;color:var(--text-lo);cursor:pointer;padding:0;font-size:1.1rem;line-height:1;">×</button>
+                    </div>
+                </div>
+                notifIndex++;
+            }
+        </div>
+        <script>
+        (function () {
+            // Mark all live notifications "seen" by bumping the cookie to NOW so they won't re-fire.
+            var now = new Date().toISOString();
+            document.cookie = 'ul_lastSeenNotif=' + encodeURIComponent(now) + '; path=/; max-age=' + (60*60*24*30) + '; SameSite=Lax';
+
+            var stack = document.getElementById('ul-live-toast-stack');
+            if (!stack) return;
+            var toasts = stack.querySelectorAll('.ul-live-toast');
+
+            // Animate in
+            requestAnimationFrame(function(){
+                toasts.forEach(function(t){ t.classList.add('show'); });
+            });
+
+            // Dismiss handler
+            toasts.forEach(function(t){
+                var close = t.querySelector('.ul-live-toast-close');
+                if (close) close.addEventListener('click', function(){
+                    t.classList.remove('show');
+                    setTimeout(function(){ t.remove(); }, 350);
+                });
+                // Auto-dismiss after 10s
+                setTimeout(function(){
+                    if (!t.isConnected) return;
+                    t.classList.remove('show');
+                    setTimeout(function(){ t.remove(); }, 350);
+                }, 10000);
+            });
+        })();
+        </script>
+    }
+
+    <main class="ul-page">
+        @RenderBody()
+    </main>
+
+    <footer class="ul-footer">
+        <div class="ul-footer-inner">
+            <div class="ul-footer-brand-col">
+                <a class="ul-brand" asp-controller="Home" asp-action="Index">
+                    <span class="ul-brand-dot"></span>UrbanLink
+                </a>
+                <p style="margin-top:0.6rem;color:rgba(255,255,255,0.85);font-size:0.85rem;max-width:300px;">
+                    Ride-sharing and travel-event coordination for Bulgaria.
+                </p>
+            </div>
+            <div class="ul-footer-links">
+                <a asp-controller="Home" asp-action="Privacy">Privacy</a>
+                <a asp-controller="Home" asp-action="Terms">Terms</a>
+                <a asp-controller="Home" asp-action="Contacts">Contacts</a>
+            </div>
+            <div class="ul-footer-contact">
+                <a href="mailto:nikolay.dyulgerov.highschool@buditel.bg" style="display:inline-flex;align-items:center;gap:0.4rem;color:rgba(255,255,255,0.85);text-decoration:none;font-size:0.85rem;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    nikolay.dyulgerov.highschool@@buditel.bg
+                </a>
+                <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+                    <a href="https://facebook.com/" target="_blank" rel="noopener" class="ul-social" aria-label="Facebook">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                    </a>
+                    <a href="https://instagram.com/" target="_blank" rel="noopener" class="ul-social" aria-label="Instagram">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="ul-footer-bottom">© @DateTime.Now.Year UrbanLink — all rights reserved.</div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+    // ---- Hamburger menu ----
+    (function () {
+        var btn   = document.getElementById('hamburger');
+        var links = document.getElementById('navLinks');
+        if (!btn || !links) return;
+        btn.addEventListener('click', function () {
+            links.classList.toggle('open');
+            btn.classList.toggle('open');
+        });
+    })();
+
+    // ---- Dropdown ----
+    (function () {
+        var dd = document.getElementById('userDropdown');
+        if (!dd) return;
+        var toggle = dd.querySelector('.ul-user-dropdown-toggle');
+        var menu   = dd.querySelector('.ul-dropdown-menu');
+        var chev   = toggle ? toggle.querySelector('svg:last-child') : null;
+
+        function openMenu()  { menu.classList.add('open');    toggle.setAttribute('aria-expanded','true');  if(chev) chev.style.transform='rotate(180deg)'; }
+        function closeMenu() { menu.classList.remove('open'); toggle.setAttribute('aria-expanded','false'); if(chev) chev.style.transform=''; }
+
+        toggle.addEventListener('click', function(e){ e.stopPropagation(); menu.classList.contains('open') ? closeMenu() : openMenu(); });
+        document.addEventListener('click', function(e){ if(!dd.contains(e.target)) closeMenu(); });
+        document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeMenu(); });
+    })();
+
+    // ---- Clickable rows (tables, trip rows): navigate on click anywhere except links/buttons/forms ----
+    (function () {
+        document.addEventListener('click', function (e) {
+            var t = e.target;
+            // Bail if user clicked an interactive element inside the row
+            if (t.closest('a, button, form, [data-stop-row]')) return;
+            var row = t.closest('.ul-row-clickable');
+            if (!row || !row.dataset.href) return;
+            window.location.href = row.dataset.href;
+        });
+    })();
+
+    // ---- Custom confirm ----
+    (function () {
+        var overlay   = document.getElementById('ul-confirm-overlay');
+        var msgEl     = document.getElementById('ul-confirm-text');
+        var okBtn     = document.getElementById('ul-confirm-ok');
+        var cancelBtn = document.getElementById('ul-confirm-cancel');
+        var _resolve;
+
+        window.ulConfirm = function(msg) {
+            return new Promise(function(res){
+                _resolve = res;
+                msgEl.textContent = msg;
+                overlay.style.display = 'flex';
+                okBtn.focus();
+            });
+        };
+        okBtn.addEventListener('click',     function(){ overlay.style.display='none'; if(_resolve) _resolve(true); });
+        cancelBtn.addEventListener('click', function(){ overlay.style.display='none'; if(_resolve) _resolve(false); });
+        overlay.addEventListener('click',   function(e){ if(e.target===overlay){ overlay.style.display='none'; if(_resolve) _resolve(false); } });
+
+        // Intercept data-confirm-msg forms
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            var msg  = form.dataset.confirmMsg;
+            if (!msg) return;
+            e.preventDefault();
+            window.ulConfirm(msg).then(function(ok){ if(ok){ form.removeAttribute('data-confirm-msg'); form.submit(); } });
+        }, true);
+    })();
+    </script>
+</body>
+</html>

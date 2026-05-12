@@ -1,0 +1,99 @@
+@{
+    ViewData["Title"] = "Age verification";
+    var existing   = ViewBag.Existing as UrbanLinkStarter.Models.VerificationRequest;
+    var isVerified = (bool)(ViewBag.IsVerified ?? false);
+}
+
+<a class="ul-trip-card-link ul-enter" asp-controller="Profile" asp-action="Index" style="margin-bottom:1rem;display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Back to profile
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div><div class="ul-section-sub">/ Trust &amp; safety</div><h2>Age verification</h2></div>
+</div>
+<p style="color:var(--text-mid);max-width:680px;margin-bottom:1.25rem;">Required to send direct messages and reserve trips. (To <em>create</em> trips, complete the separate <a asp-controller="DriverVerification" asp-action="Index" style="color:var(--accent-cyan);">Driver verification</a>.)</p>
+
+@if (TempData["Success"] != null) {
+    <div class="ul-card ul-enter" style="border-color:rgba(78,224,176,0.4);background:rgba(78,224,176,0.05);margin-bottom:1rem;"><p style="margin:0;color:var(--accent-mint);">@TempData["Success"]</p></div>
+}
+@if (TempData["Error"] != null) {
+    <div class="ul-auth-error ul-enter" style="margin-bottom:1rem;">@TempData["Error"]</div>
+}
+
+@if (isVerified) {
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#58c8ff,#3b82f6);display:flex;align-items:center;justify-content:center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h3 style="margin:0 0 0.4rem;">Age verified ✓</h3>
+        <p style="color:var(--text-mid);margin:0;">You can now send direct messages and reserve trips.</p>
+    </div>
+} else if (existing != null && existing.Status == UrbanLinkStarter.Models.VerificationStatus.Pending) {
+    <div class="ul-card ul-enter" style="text-align:center;padding:2rem;">
+        <div style="margin:0 auto 1rem;width:64px;height:64px;border-radius:50%;background:var(--grad-amber);display:flex;align-items:center;justify-content:center;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--bg-deep)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3 style="margin:0 0 0.4rem;">Pending review</h3>
+        <p style="color:var(--text-mid);margin:0;">An admin will review your document shortly.</p>
+    </div>
+} else {
+    <p style="color:var(--text-mid);max-width:640px;margin-bottom:1.25rem;">Upload one of: a national ID, driver's license, passport, or a screenshot of your verified Revolut account. We use it only to confirm you're 18+ and delete it after review.</p>
+
+    <form method="post" asp-action="Submit" enctype="multipart/form-data" class="ul-form-card" id="verifForm">
+        @Html.AntiForgeryToken()
+
+        <div class="ul-form-row">
+            <label>Document type</label>
+            <select name="documentType" class="ul-input" style="cursor:pointer;">
+                <option value="0">National ID card</option>
+                <option value="1">Driver's license</option>
+                <option value="2">Passport</option>
+                <option value="3">Revolut profile</option>
+            </select>
+        </div>
+
+        <div class="ul-form-row">
+            <label>Upload image</label>
+            <input type="file" name="document" accept="image/*" class="ul-input" required style="padding:0.7rem 1rem;" id="docInput" />
+        </div>
+
+        @if (existing != null && existing.Status == UrbanLinkStarter.Models.VerificationStatus.Rejected) {
+            <div class="ul-auth-error" style="margin-top:1rem;">
+                Your previous submission was rejected.
+                @if (!string.IsNullOrWhiteSpace(existing.AdminNote)) { <span>Reason: @existing.AdminNote</span> }
+            </div>
+        }
+
+        @* GDPR consent *@
+        <div class="ul-card" style="margin-top:1.25rem;background:rgba(255,181,71,0.05);border-color:rgba(255,181,71,0.3);">
+            <h4 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--accent-amber);">🔒 Data protection (GDPR)</h4>
+            <p style="font-size:0.88rem;color:var(--text-mid);margin:0 0 0.85rem;line-height:1.55;">
+                Your document is uploaded solely to verify that you are 18 or older. It is stored temporarily and <strong>permanently deleted</strong> from our servers as soon as an admin completes the review — whether approved or rejected. We do not share, sell, or retain this data. By submitting you consent to this single-purpose processing under <a href="https://gdpr.eu" target="_blank" rel="noopener" style="color:var(--accent-cyan);">EU GDPR</a>.
+            </p>
+            <label class="ul-checkbox" id="gdprLabel">
+                <input type="checkbox" id="gdprCheck" required />
+                <span>I understand and consent to my document being processed solely for age verification and deleted immediately after review.</span>
+            </label>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button type="submit" class="ul-btn ul-btn-success" id="submitBtn" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                Submit for review
+            </button>
+            <a class="ul-btn ul-btn-secondary" asp-controller="Profile" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+
+    @section Scripts {
+    <script>
+    document.addEventListener('DOMContentLoaded', function(){
+        var check  = document.getElementById('gdprCheck');
+        var submit = document.getElementById('submitBtn');
+        if (!check || !submit) return;
+        check.addEventListener('change', function(){ submit.disabled = !check.checked; });
+    });
+    </script>
+    }
+}

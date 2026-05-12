@@ -1,0 +1,73 @@
+@model Event
+@{
+    ViewData["Title"] = "Edit event";
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Events" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Manage events
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Control room · Edit event</div>
+        <h2>Edit event</h2>
+    </div>
+</div>
+
+<form method="post" asp-route-id="@Model.Id" class="ul-form-card">
+    @Html.AntiForgeryToken()
+    <input asp-for="Id" type="hidden" />
+
+    <div class="ul-form-row">
+        <label asp-for="Title">Title</label>
+        <input asp-for="Title" class="ul-input" />
+    </div>
+    <div class="ul-form-row">
+        <label asp-for="Description">Description</label>
+        <textarea asp-for="Description" class="ul-textarea">@Model.Description</textarea>
+    </div>
+    <div class="ul-form-row">
+        <label asp-for="Location">Location</label>
+        <input asp-for="Location" class="ul-input" data-place-suggest />
+    </div>
+    <div class="ul-form-row">
+        <label>Date &amp; time</label>
+        <div class="ul-wheel-row">
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Date</div>
+                <div data-date-wheel data-target="editEvHidDate" data-value="@Model.EventDate.ToString("yyyy-MM-dd")" data-combine-with="editEvHidden" data-time-input="editEvHidTime"></div>
+            </div>
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Time (24h)</div>
+                <div data-time-wheel data-target="editEvHidTime" data-value="@Model.EventDate.ToString("HH:mm")" data-combine-with="editEvHidden" data-date-input="editEvHidDate"></div>
+            </div>
+        </div>
+        <input type="hidden" id="editEvHidDate" value="@Model.EventDate.ToString("yyyy-MM-dd")" />
+        <input type="hidden" id="editEvHidTime" value="@Model.EventDate.ToString("HH:mm")" />
+        <input asp-for="EventDate" type="hidden" id="editEvHidden" value="@Model.EventDate.ToString("yyyy-MM-ddTHH:mm")" />
+    </div>
+
+    <div style="display:flex; gap:0.75rem; margin-top:1.75rem;">
+        <button type="submit" class="ul-btn ul-btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Save changes
+        </button>
+        <a class="ul-btn ul-btn-secondary" asp-action="Events">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var d = document.getElementById('editEvHidDate');
+    var t = document.getElementById('editEvHidTime');
+    var h = document.getElementById('editEvHidden');
+    if (d && t && h) {
+        function sync() { if (d.value && t.value) h.value = d.value + 'T' + t.value; }
+        d.addEventListener('change', sync);
+        t.addEventListener('change', sync);
+    }
+});
+</script>
+}

@@ -1,0 +1,35 @@
+@model UrbanLinkStarter.Models.ApplicationUser
+@{
+    ViewData["Title"] = "Edit profile";
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Back to profile
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div>
+        <div class="ul-section-sub">/ Your profile</div>
+        <h2>Edit profile</h2>
+    </div>
+</div>
+
+<form method="post" class="ul-form-card">
+    @Html.AntiForgeryToken()
+    <div class="ul-form-row">
+        <label>Full name</label>
+        <input name="fullName" class="ul-input" value="@Model.FullName" placeholder="Your name" />
+    </div>
+    <div class="ul-form-row">
+        <label>Bio</label>
+        <textarea name="bio" class="ul-textarea" placeholder="Tell other riders a bit about yourself...">@Model.Bio</textarea>
+    </div>
+    <div style="display:flex; gap:0.75rem; margin-top: 1.25rem;">
+        <button type="submit" class="ul-btn ul-btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Save changes
+        </button>
+        <a class="ul-btn ul-btn-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

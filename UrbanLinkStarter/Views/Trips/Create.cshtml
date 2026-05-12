@@ -1,0 +1,291 @@
+@model Trip
+@{
+    ViewData["Title"] = "Post a trip";
+    var events = ViewBag.UpcomingEvents as List<Event> ?? new();
+    var initDate = DateTime.Now.AddDays(1).ToString("yyyy-MM-dd");
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom:1rem;display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    Find a Trip
+</a>
+
+<div class="ul-section-head ul-enter">
+    <div><div class="ul-section-sub">/ New listing</div><h2>Post a trip</h2></div>
+</div>
+
+<form method="post" class="ul-form-card" id="tripForm">
+
+    <div class="ul-form-row">
+        <label asp-for="Title">Title</label>
+        <input asp-for="Title" class="ul-input" placeholder="e.g. Sofia → Plovdiv weekend run" />
+    </div>
+
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="FromLocation">From</label>
+            <input asp-for="FromLocation" id="fromInput" class="ul-input" placeholder="Sofia" data-place-suggest />
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="ToLocation">To</label>
+            <input asp-for="ToLocation" id="toInput" class="ul-input" placeholder="Plovdiv" data-place-suggest />
+        </div>
+    </div>
+
+    <div class="ul-form-row" style="margin-top:1.2rem;">
+        <label>When are you going?</label>
+        <div class="ul-quickpick" id="quickPick">
+            <button type="button" class="ul-chip" data-when="this-evening">This evening</button>
+            <button type="button" class="ul-chip" data-when="tomorrow-morning">Tomorrow 09:00</button>
+            <button type="button" class="ul-chip" data-when="tomorrow-evening">Tomorrow 18:00</button>
+            <button type="button" class="ul-chip" data-when="this-weekend">This weekend</button>
+        </div>
+        <div class="ul-wheel-row">
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Date</div>
+                <div data-date-wheel data-target="hidDate" data-value="@initDate" data-combine-with="tripTravelDate" data-time-input="hidTime"></div>
+            </div>
+            <div class="ul-wheel-group">
+                <div class="ul-wheel-label">Time (24h)</div>
+                <div data-time-wheel data-target="hidTime" data-value="09:00" data-combine-with="tripTravelDate" data-date-input="hidDate"></div>
+            </div>
+        </div>
+        <input type="hidden" id="hidDate" value="@initDate" />
+        <input type="hidden" id="hidTime" value="09:00" />
+        <input asp-for="TravelDate" type="hidden" id="tripTravelDate" value="@(initDate + "T09:00")" />
+    </div>
+
+    <div class="ul-section-sub" style="margin-top:1.5rem;">/ Your car</div>
+
+    <div class="ul-form-grid">
+        <div class="ul-form-row">
+            <label asp-for="CarBrand">Car brand</label>
+            <input asp-for="CarBrand" id="carBrandInput" class="ul-input" placeholder="e.g. Volkswagen" list="carBrandsList" autocomplete="off" />
+            <datalist id="carBrandsList">
+                <option value="Alfa Romeo"/><option value="Audi"/><option value="BMW"/>
+                <option value="BYD"/><option value="Chevrolet"/><option value="Citroën"/>
+                <option value="Dacia"/><option value="Fiat"/><option value="Ford"/>
+                <option value="Honda"/><option value="Hyundai"/><option value="Infiniti"/>
+                <option value="Jaguar"/><option value="Jeep"/><option value="Kia"/>
+                <option value="Land Rover"/><option value="Lexus"/><option value="Mazda"/>
+                <option value="Mercedes-Benz"/><option value="Mini"/><option value="Mitsubishi"/>
+                <option value="Nissan"/><option value="Opel"/><option value="Peugeot"/>
+                <option value="Porsche"/><option value="Renault"/><option value="SEAT"/>
+                <option value="Škoda"/><option value="Smart"/><option value="Subaru"/>
+                <option value="Suzuki"/><option value="Tesla"/><option value="Toyota"/>
+                <option value="Volvo"/><option value="Volkswagen"/>
+            </datalist>
+        </div>
+        <div class="ul-form-row">
+            <label asp-for="CarModel">Model</label>
+            <input asp-for="CarModel" class="ul-input" placeholder="e.g. Golf 7 2.0 TDI" />
+        </div>
+    </div>
+
+    <div class="ul-form-grid" style="margin-top:0.85rem; align-items:start;">
+        <div class="ul-form-row">
+            <label asp-for="CarYear">Year</label>
+            <div data-year-wheel data-target="CarYearHid" data-value="@(Model.CarYear > 0 ? Model.CarYear : DateTime.Now.Year)" data-min="1980" data-max="@DateTime.Now.Year"></div>
+            <input asp-for="CarYear" type="hidden" id="CarYearHid" value="@(Model.CarYear > 0 ? Model.CarYear : DateTime.Now.Year)" />
+        </div>
+        <div>
+            <div class="ul-form-row">
+                <label asp-for="FuelType">Fuel</label>
+                <select asp-for="FuelType" id="fuelType" class="ul-input" style="cursor:pointer;">
+                    <option value="0">Gasoline</option>
+                    <option value="1">Diesel</option>
+                    <option value="2">LPG</option>
+                    <option value="3">Electric</option>
+                </select>
+            </div>
+            <div class="ul-form-row" style="margin-top:0.85rem;">
+                <label asp-for="FuelConsumption" id="consumptionLabel">Consumption (L/100km)</label>
+                <input asp-for="FuelConsumption" id="fuelConsumption" type="number" step="0.1" min="1" max="30" class="ul-input" placeholder="7.0" />
+            </div>
+        </div>
+    </div>
+
+    <div class="ul-form-row" style="margin-top:1.2rem;">
+        <label asp-for="AvailableSeats">Available seats</label>
+        <div class="ul-seats" id="seatsPicker">
+            @for (int i = 1; i <= 6; i++) {
+                <button type="button" class="ul-seat-btn @(i==3?"active":"")" data-seats="@i">@i</button>
+            }
+        </div>
+        <input asp-for="AvailableSeats" type="hidden" id="seatsInput" value="3" />
+    </div>
+
+    <div class="ul-form-row" style="margin-top:1.5rem;">
+        <label>Estimated price per seat</label>
+        <div class="ul-cost-preview" id="costPreview">
+            <p class="ul-cost-preview-empty">Fill the From and To destinations to see the calculated price.</p>
+        </div>
+    </div>
+
+    @if (events.Any())
+    {
+        <div class="ul-form-row" style="margin-top:1.5rem;" id="eventPickerSection">
+            <label>Going to an event? <span style="color:var(--text-lo);font-weight:500;text-transform:none;letter-spacing:0;">(optional)</span></label>
+            <div class="ul-event-picker">
+                <div class="ul-event-pick active" data-event-id="" tabindex="0" role="button">
+                    <div class="ul-event-pick-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    </div>
+                    <div class="ul-event-pick-body">
+                        <div class="ul-event-pick-title">No event</div>
+                        <div class="ul-event-pick-meta">Standalone trip</div>
+                    </div>
+                </div>
+                @foreach (var ev in events) {
+                    <div class="ul-event-pick" data-event-id="@ev.Id" tabindex="0" role="button">
+                        <div class="ul-event-pick-icon ul-event-pick-icon-amber">
+                            <span class="ul-event-pick-day">@ev.EventDate.ToString("dd")</span>
+                            <span class="ul-event-pick-month">@ev.EventDate.ToString("MMM").ToUpper()</span>
+                        </div>
+                        <div class="ul-event-pick-body">
+                            <div class="ul-event-pick-title">@ev.Title</div>
+                            <div class="ul-event-pick-meta">@ev.Location · @ev.EventDate.ToString("HH:mm")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <input type="hidden" name="EventId" id="eventIdInput" value="" />
+        </div>
+    } else {
+        <input type="hidden" name="EventId" value="" />
+    }
+
+    <div style="display:flex;gap:0.75rem;margin-top:1.75rem;">
+        <button type="submit" class="ul-btn ul-btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Save trip
+        </button>
+        <a class="ul-btn ul-btn-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // ---- Date/time sync ----
+    var hidDate = document.getElementById('hidDate');
+    var hidTime = document.getElementById('hidTime');
+    var hidComb = document.getElementById('tripTravelDate');
+    function syncComb() { if (hidDate.value && hidTime.value) hidComb.value = hidDate.value + 'T' + hidTime.value; }
+    hidDate.addEventListener('change', syncComb);
+    hidTime.addEventListener('change', syncComb);
+
+    // ---- Quick-pick ----
+    function pad(n) { return String(n).padStart(2,'0'); }
+    document.getElementById('quickPick').addEventListener('click', function(e) {
+        var btn = e.target.closest('.ul-chip'); if (!btn) return; e.preventDefault();
+        var d = new Date(); d.setSeconds(0,0);
+        switch(btn.dataset.when) {
+            case 'this-evening':     d.setHours(19,0); break;
+            case 'tomorrow-morning': d.setDate(d.getDate()+1); d.setHours(9,0); break;
+            case 'tomorrow-evening': d.setDate(d.getDate()+1); d.setHours(18,0); break;
+            case 'this-weekend':
+                var add=(6-d.getDay()+7)%7; if(!add) add=7;
+                d.setDate(d.getDate()+add); d.setHours(10,0); break;
+        }
+        var ds=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+        var ts=pad(d.getHours())+':'+pad(Math.round(d.getMinutes()/5)*5||0);
+        hidDate.value=ds; hidTime.value=ts; syncComb();
+        ['[data-date-wheel]','[data-time-wheel]'].forEach(function(sel){
+            var el=document.querySelector(sel); if(!el) return;
+            el.dataset.value=sel.includes('date')?ds:ts;
+            delete el.dataset.wheelInit; el.innerHTML='';
+        });
+        if(window.__wheelAttach) window.__wheelAttach();
+        document.querySelectorAll('#quickPick .ul-chip').forEach(function(c){c.classList.remove('active');});
+        btn.classList.add('active');
+    });
+
+    // ---- Seats ----
+    var seatsPicker=document.getElementById('seatsPicker');
+    var seatsInput=document.getElementById('seatsInput');
+    seatsPicker.addEventListener('click',function(e){
+        var b=e.target.closest('.ul-seat-btn'); if(!b) return; e.preventDefault();
+        seatsInput.value=b.dataset.seats;
+        seatsPicker.querySelectorAll('.ul-seat-btn').forEach(function(x){x.classList.toggle('active',x===b);});
+        recalc();
+    });
+
+    // ---- Event picker (using div, not button, to avoid form submit) ----
+    var picker = document.getElementById('eventPickerSection');
+    if (picker) {
+        picker.addEventListener('click', function(e) {
+            var item = e.target.closest('.ul-event-pick'); if (!item) return;
+            document.getElementById('eventIdInput').value = item.dataset.eventId || '';
+            picker.querySelectorAll('.ul-event-pick').forEach(function(x){x.classList.remove('active');});
+            item.classList.add('active');
+        });
+        // Keyboard support
+        picker.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                var item = e.target.closest('.ul-event-pick'); if (!item) return;
+                e.preventDefault();
+                document.getElementById('eventIdInput').value = item.dataset.eventId || '';
+                picker.querySelectorAll('.ul-event-pick').forEach(function(x){x.classList.remove('active');});
+                item.classList.add('active');
+            }
+        });
+    }
+
+    // ---- Fuel label ----
+    var fuelTypeEl=document.getElementById('fuelType');
+    var fuelCons=document.getElementById('fuelConsumption');
+    var consumptionLabel=document.getElementById('consumptionLabel');
+    fuelTypeEl.addEventListener('change',function(){
+        consumptionLabel.textContent=fuelTypeEl.value==='3'?'Consumption (kWh/100km)':'Consumption (L/100km)';
+        recalc();
+    });
+
+    // ---- Cost calc ----
+    var fromInput=document.getElementById('fromInput');
+    var toInput=document.getElementById('toInput');
+    var preview=document.getElementById('costPreview');
+    var FUEL={0:2.85,1:2.75,2:1.45,3:0.45};
+    var lastDist=null, lastFT='', debT=null;
+    [fromInput,toInput,fuelCons].forEach(function(el){ el.addEventListener('input',recalc); el.addEventListener('change',recalc); });
+
+    function recalc() {
+        var from=(fromInput.value||'').trim(), to=(toInput.value||'').trim();
+        if(!from||!to){preview.innerHTML='<p class="ul-cost-preview-empty">Fill the From and To destinations to see the calculated price.</p>';return;}
+        clearTimeout(debT);
+        debT=setTimeout(function(){
+            var ft=from+'|'+to;
+            if(ft!==lastFT){lastFT=ft;lastDist=null;fetchDist(from,to).then(function(km){lastDist=km;render();});}
+            else render();
+        },350);
+    }
+    function fetchDist(f,t){
+        var b='https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bg&q=';
+        return Promise.all([fetch(b+encodeURIComponent(f)).then(r=>r.json()),fetch(b+encodeURIComponent(t)).then(r=>r.json())])
+            .then(function(p){
+                if(!p[0].length||!p[1].length)return null;
+                return haversine(+p[0][0].lat,+p[0][0].lon,+p[1][0].lat,+p[1][0].lon);
+            }).catch(()=>null);
+    }
+    function haversine(lat1,lon1,lat2,lon2){
+        var R=6371,rad=d=>d*Math.PI/180,dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);
+        var a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+        return Math.round(2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))*10)/10;
+    }
+    function render(){
+        if(!lastDist){preview.innerHTML='<p class="ul-cost-preview-empty">Couldn\'t locate one of the cities. Pick a known Bulgarian city.</p>';return;}
+        var cons=parseFloat(fuelCons.value)||0;
+        if(!cons){preview.innerHTML='<p class="ul-cost-preview-empty">Enter your car\'s consumption to estimate the price.</p>';return;}
+        var seats=parseInt(seatsInput.value,10)||1;
+        var rate=FUEL[fuelTypeEl.value]||2.85;
+        var total=(lastDist*cons/100)*rate, per=total/seats;
+        var unit=fuelTypeEl.value==='3'?'kWh':'L';
+        preview.innerHTML='<div class="ul-cost-grid">'
+            +'<div><div class="ul-cost-item-label">Distance</div><div class="ul-cost-item-value">'+lastDist.toFixed(0)+' km</div></div>'
+            +'<div><div class="ul-cost-item-label">Total fuel</div><div class="ul-cost-item-value">'+(lastDist*cons/100).toFixed(1)+' '+unit+' · € '+total.toFixed(2)+'</div></div>'
+            +'<div><div class="ul-cost-item-label">Per seat (÷ '+seats+')</div><div class="ul-cost-item-value ul-cost-item-value-accent">€ '+per.toFixed(2)+'</div></div>'
+            +'</div>';
+    }
+});
+</script>
+}

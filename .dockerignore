@@ -1,0 +1,10 @@
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/*.user
+**/TestResults
+UrbanLinkStarter.Tests/
+.git
+.gitignore
+*.md

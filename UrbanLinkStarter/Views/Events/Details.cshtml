@@ -1,0 +1,217 @@
+@model Event
+@{
+    ViewData["Title"] = Model.Title;
+    var messages = ViewBag.Messages as List<Message> ?? new();
+    var trips    = ViewBag.Trips as List<Trip> ?? new();
+    var adminIds = ViewBag.AdminUserIds as HashSet<string> ?? new();
+
+    string Initials(string? full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "U";
+        var parts = full.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Substring(0, 1).ToUpper();
+        return (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpper();
+    }
+    string AvatarVariant(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        var classes = new[] { "", "ul-avatar-violet", "ul-avatar-mint", "ul-avatar-sunset" };
+        return classes[Math.Abs(key.GetHashCode()) % classes.Length];
+    }
+}
+
+<a class="ul-trip-card-link ul-enter" asp-action="Index" style="margin-bottom: 1rem; display:inline-flex;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    All events
+</a>
+
+<section class="ul-detail-hero ul-enter" style="display:flex; align-items:center; gap: 2rem; flex-wrap: wrap;">
+    <div class="ul-event-date" style="width: 96px; padding: 1.25rem 0.5rem;">
+        <div class="ul-event-date-day" style="font-size: 2.6rem;">@Model.EventDate.ToString("dd")</div>
+        <div class="ul-event-date-month">@Model.EventDate.ToString("MMM")</div>
+    </div>
+    <div style="flex:1; min-width: 240px;">
+        <div class="ul-section-sub">/ Event</div>
+        <h1 style="margin: 0.4rem 0 0.85rem;">@Model.Title</h1>
+        <div class="ul-event-meta" style="font-size: 0.95rem;">
+            <span class="ul-event-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                @Model.Location
+            </span>
+            <span class="ul-event-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                @Model.EventDate.ToString("dddd, MMMM d · HH:mm")
+            </span>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p style="margin-top: 1rem; max-width: 720px;">@Model.Description</p>
+        }
+    </div>
+</section>
+
+@* ---- Map (geocoded location) ---- *@
+<div class="ul-section-head" style="margin-top: 2rem;">
+    <div>
+        <div class="ul-section-sub">/ Location</div>
+        <h2>Where it's at</h2>
+    </div>
+</div>
+<div class="ul-map-wrap ul-enter" id="eventMapWrap">
+    <span class="ul-map-label" id="eventMapLabel">● @Model.Location</span>
+    <iframe id="eventMapFrame" loading="lazy"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=22.0,41.5,24.0,43.5&amp;layer=mapnik">
+    </iframe>
+</div>
+<script>
+(function() {
+    var location = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Location));
+    if (!location) return;
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bg&q=' + encodeURIComponent(location), {
+        headers: { 'Accept-Language': 'en' }
+    }).then(function(r){ return r.json(); }).then(function(data) {
+        if (!data || !data.length) return;
+        var lat = parseFloat(data[0].lat);
+        var lon = parseFloat(data[0].lon);
+        var d = 0.02;
+        var bbox = (lon-d)+','+(lat-d)+','+(lon+d)+','+(lat+d);
+        document.getElementById('eventMapFrame').src =
+            'https://www.openstreetmap.org/export/embed.html?bbox=' + bbox + '&layer=mapnik&marker=' + lat + ',' + lon;
+    }).catch(function(){});
+})();
+</script>
+
+@* ---- Trips heading to this event ---- *@
+<div class="ul-section-head" style="margin-top: 2.5rem;">
+    <div>
+        <div class="ul-section-sub">/ Heading there</div>
+        <h2>Trips for this event</h2>
+    </div>
+    <a class="ul-btn ul-btn-secondary" asp-controller="Trips" asp-action="Create" asp-route-eventId="@Model.Id">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Offer a ride
+    </a>
+</div>
+
+@if (trips.Any())
+{
+    <div class="ul-grid ul-grid-2 ul-stagger">
+    @foreach (var trip in trips)
+    {
+        <a class="ul-card-link" asp-controller="Trips" asp-action="Details" asp-route-id="@trip.Id">
+            <article class="ul-card ul-trip-card">
+                <div class="ul-trip-card-head">
+                    <h3 class="ul-trip-card-title">@trip.Title</h3>
+                    <span class="ul-trip-card-price">€ @trip.Price.ToString("0.##")</span>
+                </div>
+                <div class="ul-route">
+                    <div class="ul-route-stop">
+                        <div class="ul-route-stop-label">From</div>
+                        <div class="ul-route-stop-name">@trip.FromLocation</div>
+                    </div>
+                    <div class="ul-route-line"></div>
+                    <div class="ul-route-stop" style="text-align:right;">
+                        <div class="ul-route-stop-label">To</div>
+                        <div class="ul-route-stop-name">@trip.ToLocation</div>
+                    </div>
+                </div>
+                <div class="ul-trip-meta">
+                    <span class="ul-trip-meta-item">📅 @trip.TravelDate.ToString("ddd, MMM d · HH:mm")</span>
+                    <span class="ul-trip-meta-item">👥 @trip.AvailableSeats seats</span>
+                    @if (trip.Driver != null)
+                    {
+                        <span class="ul-trip-meta-item" style="color: var(--accent-mint);">@trip.Driver.FullName</span>
+                    }
+                </div>
+            </article>
+        </a>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty">
+        <div class="ul-empty-icon">🛣️</div>
+        <p>No rides offered yet — be the first to share one.</p>
+    </div>
+}
+
+@* ---- Chatroom ---- *@
+<div class="ul-section-head" style="margin-top: 2.5rem;">
+    <div>
+        <div class="ul-section-sub">/ Event chatroom</div>
+        <h2>Talk it through</h2>
+    </div>
+    <span class="ul-pill ul-pill-mint">@messages.Count message@(messages.Count == 1 ? "" : "s")</span>
+</div>
+
+@if (User.Identity != null && User.Identity.IsAuthenticated)
+{
+    <form method="post" asp-action="PostMessage" asp-route-id="@Model.Id" class="ul-message-composer ul-enter">
+        @Html.AntiForgeryToken()
+        <div class="ul-message-composer-row">
+            <input name="content" class="ul-input" placeholder="Say something about this event..." autocomplete="off" maxlength="300" required />
+            <button class="ul-btn ul-btn-primary" type="submit">
+                Send
+                <svg class="ul-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+        </div>
+    </form>
+}
+else
+{
+    <div class="ul-card ul-enter" style="text-align:center; padding: 1.5rem;">
+        <p style="margin: 0 0 0.75rem; color: var(--text-mid);">Sign in to join the chat.</p>
+        <a class="ul-btn ul-btn-primary" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Details", "Events", new { id = Model.Id })">Sign in</a>
+    </div>
+}
+
+@if (messages.Any())
+{
+    <div class="ul-stagger" style="margin-top: 1rem;">
+    @foreach (var m in messages)
+    {
+        var u       = m.User;
+        var name    = u?.FullName ?? "User";
+        var variant = AvatarVariant(m.UserId ?? name);
+        var isAdmin = u != null && adminIds.Contains(u.Id);
+
+        <div class="ul-message">
+            <div class="ul-message-head">
+                <a class="ul-avatar @variant" asp-controller="Profile" asp-action="View" asp-route-id="@m.UserId"
+                   style="text-decoration:none; overflow:hidden; padding:0;">
+                    @if (u != null && !string.IsNullOrEmpty(u.ProfilePicture))
+                    {
+                        <img src="@u.ProfilePicture" alt="@name" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    }
+                    else
+                    {
+                        @Initials(name)
+                    }
+                </a>
+                <div>
+                    <a asp-controller="Profile" asp-action="View" asp-route-id="@m.UserId" style="text-decoration:none;">
+                        @if (u != null)
+                        {
+                            @await Html.PartialAsync("_UserName", u, new ViewDataDictionary(ViewData) { ["ulShowAge"] = true, ["ulIsAdmin"] = isAdmin })
+                        }
+                        else
+                        {
+                            <span class="ul-message-author">@name</span>
+                        }
+                    </a>
+                    <div class="ul-message-time" style="margin-left:0;">@m.CreatedOn.ToString("MMM d · HH:mm")</div>
+                </div>
+            </div>
+            <div class="ul-message-body">@m.Content</div>
+        </div>
+    }
+    </div>
+}
+else
+{
+    <div class="ul-empty" style="margin-top: 1rem;">
+        <div class="ul-empty-icon">💬</div>
+        <p>The chat's quiet — break the ice.</p>
+    </div>
+}
