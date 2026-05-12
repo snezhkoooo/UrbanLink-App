@@ -39,8 +39,8 @@ Built with **ASP.NET Core MVC 8.0 · EF Core 8 · ASP.NET Core Identity · SQL S
 - Cookie-based deduplication — each notification shows only once per browser session
 
 ### Verification
-- **Age / identity verification**: users submit a document photo → admin approves → blue ✓ tick appears next to the user's name everywhere
-- **Driver verification**: verified users submit three photos (car exterior, car interior, driving licence) → admin approves → driver status granted
+- **Age / identity verification**: users submit a document photo → admin approves
+- **Driver verification**: verified users submit three photos (car exterior, car interior, driving licence) → admin approves → driver status granted → blue ✓ tick appears next to the user's name everywhere
   - Unverified users are redirected to age verification first
 - Admin gets a red ✓ tick automatically (no submission needed)
 
@@ -48,6 +48,7 @@ Built with **ASP.NET Core MVC 8.0 · EF Core 8 · ASP.NET Core Identity · SQL S
 - Upload a profile picture (stored as a base64 data URI)
 - Age shown next to every name (18–99 range enforced)
 - Public profile pages — view trips posted, mutual friends, verification status
+- Ratings shown next to every name (if the user is a driver)
 
 ### Admin Dashboard
 - Manage users (click any row to open the user's profile)
@@ -62,7 +63,7 @@ OAuth providers are wired up; add your keys to activate them:
 "Authentication": {
   "Google":    { "ClientId": "...", "ClientSecret": "..." },
   "Facebook":  { "AppId": "...",   "AppSecret": "..."   },
-  "Twitter":   { "ConsumerKey": "...", "ConsumerSecret": "..." },
+  "X/Twitter":   { "ConsumerKey": "...", "ConsumerSecret": "..." },
   "Apple":     { "ClientId": "...", "TeamId": "...", "KeyId": "...", "PrivateKeyPath": "..." },
   "Instagram": { "ClientId": "...", "ClientSecret": "..." }
 }
